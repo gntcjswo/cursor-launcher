@@ -1,0 +1,41 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 허용된 사용자 확인 함수
+    function isAllowedUser() {
+      return request.auth != null && 
+        exists(/databases/$(database)/documents/allowedUsers/$(request.auth.token.email));
+    }
+    
+    // 허용된 사용자 컬렉션 (문서 ID는 이메일 주소)
+    match /allowedUsers/{email} {
+      allow read: if true; // 모든 인증된 사용자가 읽기 가능 (자신의 권한 확인용)
+      allow write: if false; // 수동으로만 추가 (Firebase Console에서)
+    }
+    
+    // 프로젝트
+    match /projects/{projectId} {
+      allow read: if true; // 모든 사용자가 읽기 가능
+      allow write: if isAllowedUser();
+    }
+    
+    // 카테고리
+    match /categories/{categoryId} {
+      allow read: if true;
+      allow write: if isAllowedUser();
+    }
+    
+    // 즐겨찾기
+    match /favorites/{favoriteId} {
+      allow read: if true;
+      allow write: if isAllowedUser();
+    }
+    
+    // 최근 프로젝트
+    match /recent/{recentId} {
+      allow read: if true;
+      allow write: if isAllowedUser();
+    }
+  }
+}
+
