@@ -207,9 +207,9 @@ function App() {
         const firstCategory = categoriesData[0]
         const firstCategoryName = typeof firstCategory === 'string' ? firstCategory : firstCategory.name
         setSelectedCategory(firstCategoryName)
-        // 초기 로드 시 첫 번째 카테고리의 모든 서브카테고리를 기본값으로 선택
+        // 초기 로드 시 첫 번째 카테고리의 모든 서브카테고리와 "서브카테고리 없음"을 기본값으로 선택
         const subcategories = typeof firstCategory !== 'string' ? (firstCategory.subcategories || []) : []
-        setSelectedSubcategories(subcategories)
+        setSelectedSubcategories([...subcategories, null])
       }
       setLoading(false)
     } catch (error) {
@@ -813,9 +813,10 @@ function App() {
       return false
     }
     
-    // 서브카테고리가 없는 프로젝트는 필터에서 제외
+    // 서브카테고리가 없는 프로젝트 처리
     if (!p.subcategory) {
-      return false
+      // "서브카테고리 없음"이 선택되어 있으면 표시
+      return selectedSubcategories.includes(null)
     }
     
     // 선택된 서브카테고리에 포함된 프로젝트만 표시
@@ -945,7 +946,7 @@ function App() {
                     return catName === categoryName
                   })
                   const subcategories = selectedCat && typeof selectedCat !== 'string' ? (selectedCat.subcategories || []) : []
-                  setSelectedSubcategories(subcategories) // 모든 서브카테고리를 기본값으로 선택
+                  setSelectedSubcategories([...subcategories, null]) // 모든 서브카테고리와 "서브카테고리 없음"을 기본값으로 선택
                 }}
                 style={{
                   '--tab-theme-color': categoryColor,
@@ -1008,6 +1009,18 @@ function App() {
                     </span>
                   </label>
                 ))}
+                {/* 서브카테고리 없음 체크박스 */}
+                <label className="checkbox-label checkbox-label--sub-category">
+                  <input
+                    type="checkbox"
+                    checked={selectedSubcategories.includes(null)}
+                    onChange={() => handleSubcategoryToggle(null)}
+                  />
+                  <span>
+                    <FaCheck className="checkbox-icon" />
+                    No Category
+                  </span>
+                </label>
               </>
             )
           })()}
