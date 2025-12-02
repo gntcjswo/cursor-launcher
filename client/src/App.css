@@ -291,7 +291,7 @@
   font-weight: 600;
 }
 
-.favorite-btn, .edit-btn, .delete-btn {
+.favorite-btn, .edit-btn, .delete-btn, .remove-recent-btn {
   background: none;
   border: none;
   font-size: 1rem;
@@ -322,6 +322,11 @@
 .delete-btn:hover {
   background: #ffebee;
   color: #f44336;
+}
+
+.remove-recent-btn:hover {
+  background: #fff3e0;
+  color: #ff9800;
 }
 
 .delete-btn:disabled {

@@ -47,12 +47,53 @@ const RECENT_COLLECTION = 'recent'
 export const getProjects = async () => {
 	try {
 		const projectsSnapshot = await getDocs(collection(db, PROJECTS_COLLECTION))
-		const projects = projectsSnapshot.docs.map((doc, index) => ({
-			id: doc.id,
-			...doc.data(),
-			index: index + 1
+		const projects = projectsSnapshot.docs.map((doc) => {
+			const data = doc.data()
+			return {
+				id: doc.id,
+				...data,
+				// number 필드가 없으면 기존 프로젝트를 위한 마이그레이션 (나중에 추가됨)
+				number: data.number || 0
+			}
+		})
+		
+		// number 기준으로 정렬 (number가 0이거나 없는 경우는 마지막으로)
+		projects.sort((a, b) => {
+			const aNum = a.number || 0
+			const bNum = b.number || 0
+			if (aNum === 0 && bNum === 0) return 0
+			if (aNum === 0) return 1
+			if (bNum === 0) return -1
+			return aNum - bNum
+		})
+		
+		// number가 0이거나 없는 프로젝트들에 대해 순차적으로 번호 할당 (마이그레이션)
+		const numbers = projects.map(p => p.number || 0).filter(n => n > 0)
+		let currentNumber = numbers.length > 0 ? Math.max(...numbers) : 0
+		
+		const updatePromises = []
+		projects.forEach(project => {
+			if (!project.number || project.number === 0) {
+				currentNumber++
+				project.number = currentNumber
+				// Firebase에 number 필드 업데이트
+				updatePromises.push(
+					updateDoc(doc(db, PROJECTS_COLLECTION, project.id), { number: currentNumber })
+						.catch(err => console.error('Error updating project number:', err))
+				)
+			}
+		})
+		
+		// 모든 업데이트가 완료될 때까지 기다리지 않음 (비동기로 처리)
+		if (updatePromises.length > 0) {
+			Promise.all(updatePromises).catch(err => console.error('Error in batch update:', err))
+		}
+		
+		// index는 number와 동일하게 설정
+		return projects.map(project => ({
+			...project,
+			index: project.number
 		}))
-		return projects
 	} catch (error) {
 		console.error('Error in getProjects:', error)
 		throw error
@@ -60,14 +101,35 @@ export const getProjects = async () => {
 }
 
 export const addProject = async (project) => {
-	const projectData = {
-		...project,
-		isFavorite: false,
-		isRecent: false,
-		lastOpenedAt: null
+	try {
+		// 현재 모든 프로젝트를 가져와서 최대 번호 찾기
+		const projectsSnapshot = await getDocs(collection(db, PROJECTS_COLLECTION))
+		const projects = projectsSnapshot.docs.map(doc => ({
+			...doc.data(),
+			number: doc.data().number || 0
+		}))
+		
+		// 최대 번호 계산
+		const numbers = projects.map(p => p.number || 0).filter(n => n > 0)
+		const maxNumber = numbers.length > 0 ? Math.max(...numbers) : 0
+		
+		// 새 프로젝트 번호 = 최대 번호 + 1
+		const newNumber = maxNumber + 1
+		
+		const projectData = {
+			...project,
+			number: newNumber,
+			isFavorite: false,
+			isRecent: false,
+			lastOpenedAt: null
+		}
+		
+		const docRef = await addDoc(collection(db, PROJECTS_COLLECTION), projectData)
+		return { id: docRef.id, ...projectData, index: newNumber }
+	} catch (error) {
+		console.error('Error in addProject:', error)
+		throw error
 	}
-	const docRef = await addDoc(collection(db, PROJECTS_COLLECTION), projectData)
-	return { id: docRef.id, ...projectData }
 }
 
 export const updateProject = async (id, project) => {
@@ -210,16 +272,39 @@ export const getRecent = async () => {
 				)
 			)
 		} catch (orderError) {
-			// orderBy 실패 시 (인덱스 없거나 필드 없음) 일반 조회
-			recentSnapshot = await getDocs(
+			// orderBy 실패 시 (인덱스 없거나 필드 없음) 일반 조회 후 클라이언트에서 정렬
+			const unorderedSnapshot = await getDocs(
 				query(collection(db, PROJECTS_COLLECTION), where('isRecent', '==', true))
 			)
+
+			// 클라이언트에서 lastOpenedAt 기준으로 정렬
+			const sortedDocs = unorderedSnapshot.docs.sort((a, b) => {
+				const aTime = a.data().lastOpenedAt?.toMillis() || 0
+				const bTime = b.data().lastOpenedAt?.toMillis() || 0
+				return bTime - aTime // 내림차순 (가장 최근이 먼저)
+			})
+
+			recentSnapshot = {
+				docs: sortedDocs
+			}
 		}
-		const recent = recentSnapshot.docs
+		
+		// 프로젝트 이름 추출 및 중복 제거
+		const recentNames = recentSnapshot.docs
 			.map(doc => doc.data().name)
 			.filter(Boolean)
-			.slice(0, 8)
-		return recent
+		
+		// 중복 제거 (같은 이름이 여러 번 나타날 수 있으므로)
+		const uniqueRecent = []
+		const seen = new Set()
+		for (const name of recentNames) {
+			if (!seen.has(name)) {
+				seen.add(name)
+				uniqueRecent.push(name)
+			}
+		}
+		
+		return uniqueRecent.slice(0, 8)
 	} catch (error) {
 		console.error('Error in getRecent:', error)
 		return []
@@ -235,18 +320,12 @@ export const addRecent = async (projectName) => {
 			query(collection(db, PROJECTS_COLLECTION), where('name', '==', projectName))
 		)
 
-		// 프로젝트 문서의 isRecent와 lastOpenedAt 업데이트
-		const updatePromises = projectsSnapshot.docs.map(async (doc) => {
-			await updateDoc(doc.ref, {
-				isRecent: true,
-				lastOpenedAt: now
-			})
-		})
+		if (projectsSnapshot.empty) {
+			console.warn(`Project "${projectName}" not found`)
+			return
+		}
 
-		await Promise.all(updatePromises)
-
-		// 8개 초과 항목 처리: 가장 오래된 항목의 isRecent를 false로 변경
-		// 인덱스가 없을 수 있으므로 try-catch로 처리
+		// 현재 Recent 목록 가져오기 (정렬된 상태로)
 		let allRecentSnapshot
 		try {
 			allRecentSnapshot = await getDocs(
@@ -274,8 +353,51 @@ export const addRecent = async (projectName) => {
 			}
 		}
 
-		if (allRecentSnapshot.docs.length > 8) {
-			const toRemove = allRecentSnapshot.docs.slice(8)
+		// 현재 Recent 목록에서 이미 있는 프로젝트인지 확인
+		const currentRecentNames = allRecentSnapshot.docs.map(doc => doc.data().name)
+		const isAlreadyRecent = currentRecentNames.includes(projectName)
+
+		// 프로젝트 문서의 isRecent와 lastOpenedAt 업데이트
+		// 이미 Recent에 있어도 lastOpenedAt을 업데이트하여 순서를 최상단으로 이동
+		const updatePromises = projectsSnapshot.docs.map(async (doc) => {
+			await updateDoc(doc.ref, {
+				isRecent: true,
+				lastOpenedAt: now
+			})
+		})
+
+		await Promise.all(updatePromises)
+
+		// 업데이트 후 다시 Recent 목록 가져오기 (최신 순으로)
+		let updatedRecentSnapshot
+		try {
+			updatedRecentSnapshot = await getDocs(
+				query(
+					collection(db, PROJECTS_COLLECTION),
+					where('isRecent', '==', true),
+					orderBy('lastOpenedAt', 'desc')
+				)
+			)
+		} catch (orderError) {
+			// orderBy 실패 시 클라이언트에서 정렬
+			const unorderedSnapshot = await getDocs(
+				query(collection(db, PROJECTS_COLLECTION), where('isRecent', '==', true))
+			)
+
+			const sortedDocs = unorderedSnapshot.docs.sort((a, b) => {
+				const aTime = a.data().lastOpenedAt?.toMillis() || 0
+				const bTime = b.data().lastOpenedAt?.toMillis() || 0
+				return bTime - aTime
+			})
+
+			updatedRecentSnapshot = {
+				docs: sortedDocs
+			}
+		}
+
+		// 8개 초과 항목 처리: 가장 오래된 항목의 isRecent를 false로 변경
+		if (updatedRecentSnapshot.docs.length > 8) {
+			const toRemove = updatedRecentSnapshot.docs.slice(8)
 			const removePromises = toRemove.map(async (doc) => {
 				await updateDoc(doc.ref, { isRecent: false })
 			})
@@ -283,6 +405,32 @@ export const addRecent = async (projectName) => {
 		}
 	} catch (error) {
 		console.error('Error adding recent:', error)
+		throw error
+	}
+}
+
+export const removeRecent = async (projectName) => {
+	try {
+		// 프로젝트 문서 찾기
+		const projectsSnapshot = await getDocs(
+			query(collection(db, PROJECTS_COLLECTION), where('name', '==', projectName))
+		)
+
+		if (projectsSnapshot.empty) {
+			console.warn(`Project "${projectName}" not found`)
+			return
+		}
+
+		// 프로젝트 문서의 isRecent를 false로 변경
+		const updatePromises = projectsSnapshot.docs.map(async (doc) => {
+			await updateDoc(doc.ref, {
+				isRecent: false
+			})
+		})
+
+		await Promise.all(updatePromises)
+	} catch (error) {
+		console.error('Error removing recent:', error)
 		throw error
 	}
 }

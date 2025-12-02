@@ -15,6 +15,7 @@ import {
   toggleFavorite,
   getRecent,
   addRecent,
+  removeRecent,
   checkPermission,
   getUserSettings,
   updateUserSettings
@@ -175,10 +176,11 @@ function App() {
         return []
       })
 
-      // 프로젝트 데이터에 이미 isFavorite, isRecent 필드가 포함되어 있음
-      const projectsWithStatus = projectsData.map((project, index) => ({
+      // 프로젝트 데이터에 이미 isFavorite, isRecent, index(number) 필드가 포함되어 있음
+      const projectsWithStatus = projectsData.map((project) => ({
         ...project,
-        index: index + 1,
+        // number 필드가 없으면 index 사용 (하위 호환성)
+        index: project.number || project.index || 0,
         isFavorite: project.isFavorite || false,
         isRecent: project.isRecent || false
       }))
@@ -251,6 +253,26 @@ function App() {
     } catch (error) {
       console.error('Error toggling favorite:', error)
       setMessage('즐겨찾기 변경에 실패했습니다.')
+    }
+  }
+
+  const handleRemoveRecent = async (project) => {
+    if (!isAllowed) {
+      setMessage('권한이 없습니다. 허용된 계정으로 로그인해주세요.')
+      return
+    }
+
+    try {
+      await removeRecent(project.name)
+      setMessage('최근 목록에서 제거되었습니다.')
+      // 프로젝트 목록 새로고침
+      setTimeout(() => {
+        setMessage('')
+        loadProjects()
+      }, 1000)
+    } catch (error) {
+      console.error('Error removing recent:', error)
+      setMessage('최근 목록 제거에 실패했습니다.')
     }
   }
 
@@ -378,6 +400,14 @@ function App() {
     setNewProjectPath(project.path)
     setNewProjectCategory(project.category)
     setShowEditModal(true)
+  }
+
+  const handleCancelEditProject = () => {
+    setShowEditModal(false)
+    setEditingProject(null)
+    setNewProjectName('')
+    setNewProjectPath('')
+    setNewProjectCategory('')
   }
 
   const handleUpdateProject = async (e) => {
@@ -562,7 +592,11 @@ function App() {
     ? projects.filter(p => p.category === selectedCategory)
     : projects
 
-  const recentProjects = filteredProjects.filter(p => recent.includes(p.name))
+  // Recent 프로젝트를 recent 배열의 순서대로 정렬 (가장 최근 것이 먼저)
+  const recentProjects = recent
+    .map(name => filteredProjects.find(p => p.name === name))
+    .filter(Boolean) // undefined 제거
+  
   const favoriteProjects = filteredProjects.filter(p => favorites.includes(p.name))
 
   // 선택된 카테고리의 색상 가져오기
@@ -618,6 +652,10 @@ function App() {
                     <button 
                       className="add-btn"
                       onClick={() => {
+                        // 상태 초기화
+                        setEditingProject(null)
+                        setNewProjectName('')
+                        setNewProjectPath('')
                         // 카테고리는 마지막 선택한 것을 유지 (또는 현재 선택된 카테고리)
                         if (!newProjectCategory) {
                           const firstCategory = categories[0]
@@ -782,13 +820,13 @@ function App() {
 
         {/* 프로젝트 수정 모달 */}
         {showEditModal && editingProject && (
-          <div className="modal-overlay" onClick={() => setShowEditModal(false)}>
+          <div className="modal-overlay">
             <div className="modal-content" onClick={(e) => e.stopPropagation()}>
               <div className="modal-header">
                 <h2>프로젝트 수정</h2>
                 <button 
                   className="close-btn"
-                  onClick={() => setShowEditModal(false)}
+                  onClick={handleCancelEditProject}
                 >
                   <FaTimes />
                 </button>
@@ -827,7 +865,7 @@ function App() {
                   </div>
                 </div>
                 <div className="form-actions">
-                  <button type="button" onClick={() => setShowEditModal(false)}>
+                  <button type="button" onClick={handleCancelEditProject}>
                     취소
                   </button>
                   <button type="submit">수정</button>
@@ -961,6 +999,8 @@ function App() {
                   onToggleFavorite={handleToggleFavorite}
                   onEdit={handleEditProject}
                   onDelete={handleDeleteProject}
+                  onRemoveRecent={handleRemoveRecent}
+                  isRecent={true}
                   isAllowed={isAllowed}
                 />
               ))}
@@ -1012,7 +1052,7 @@ function App() {
   )
 }
 
-function ProjectCard({ project, onOpen, onToggleFavorite, onEdit, onDelete, isAllowed }) {
+function ProjectCard({ project, onOpen, onToggleFavorite, onEdit, onDelete, onRemoveRecent, isRecent, isAllowed }) {
   return (
     <div className={`project-card ${!isAllowed ? 'not-allowed' : ''}`}>
       <div className="project-header">
@@ -1049,6 +1089,18 @@ function ProjectCard({ project, onOpen, onToggleFavorite, onEdit, onDelete, isAl
             >
               <FaTrash />
             </button>
+            {isRecent && onRemoveRecent && (
+              <button
+                className="remove-recent-btn"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onRemoveRecent(project)
+                }}
+                title="최근 목록에서 제거"
+              >
+                <FaTimes />
+              </button>
+            )}
           </div>
         )}
       </div>
