@@ -5,7 +5,7 @@
 ::YAwzuBVtJxjWCl3EqQJgSA==
 ::ZR4luwNxJguZRRnk
 ::Yhs/ulQjdF+5
-::cxAkpRVqdFKZSDk=
+::cxAkpRVqdFKZSjk=
 ::cBs/ulQjdF+5
 ::ZR41oxFsdFKZSDk=
 ::eBoioBt6dFKZSDk=
@@ -40,43 +40,42 @@ echo   Cursor Launcher Backend Server
 echo ========================================
 echo.
 
-:: ?„ì¬ ?¤í¬ë¦½íŠ¸???”ë ‰? ë¦¬ë¡??´ë™
+:: Change to script directory
 cd /d "%~dp0"
 
-:: Node.jsê°€ ?¤ì¹˜?˜ì–´ ?ˆëŠ”ì§€ ?•ì¸
+:: Check if Node.js is installed
 where node >nul 2>&1
 if %ERRORLEVEL% NEQ 0 (
-  echo [?¤ë¥˜] Node.jsê°€ ?¤ì¹˜?˜ì–´ ?ˆì? ?ŠìŠµ?ˆë‹¤.
-  echo Node.jsë¥??¤ì¹˜?????¤ì‹œ ?œë„?´ì£¼?¸ìš”.
+  echo [ERROR] Node.js is not installed.
+  echo Please install Node.js and try again.
   echo https://nodejs.org/
   pause
   exit /b 1
 )
 
-:: node_modulesê°€ ?ˆëŠ”ì§€ ?•ì¸
+:: Check if node_modules exists
 if not exist "node_modules\" (
-  echo [?•ë³´] ?˜ì¡´???¨í‚¤ì§€ë¥??¤ì¹˜?˜ëŠ” ì¤?..
+  echo [INFO] Installing dependencies...
   call npm install
   if %ERRORLEVEL% NEQ 0 (
-    echo [?¤ë¥˜] ?¨í‚¤ì§€ ?¤ì¹˜???¤íŒ¨?ˆìŠµ?ˆë‹¤.
+    echo [ERROR] Failed to install packages.
     pause
     exit /b 1
   )
   echo.
 )
 
-:: ë°±ì—”???œë²„ ?œì‘
-echo [?•ë³´] ë°±ì—”???œë²„ë¥??œì‘?˜ëŠ” ì¤?..
-echo [?•ë³´] ?œë²„ ì£¼ì†Œ: http://localhost:3001
-echo [?•ë³´] ì¢…ë£Œ?˜ë ¤ë©?Ctrl+Cë¥??„ë¥´ê±°ë‚˜ ??ì°½ì„ ?«ìœ¼?¸ìš”.
+:: Start backend server
+echo [INFO] Starting backend server...
+echo [INFO] Server address: http://localhost:3001
+echo [INFO] Press Ctrl+C or close this window to stop the server.
 echo.
 echo ========================================
 echo.
 
 node server/index.js
 
-:: ?œë²„ê°€ ì¢…ë£Œ?˜ë©´
+:: Server stopped
 echo.
-echo [?•ë³´] ë°±ì—”???œë²„ê°€ ì¢…ë£Œ?˜ì—ˆ?µë‹ˆ??
+echo [INFO] Backend server has stopped.
 pause
-

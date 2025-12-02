@@ -419,6 +419,16 @@ if (process.env.NODE_ENV === 'production') {
   });
 }
 
+// Windows에서 콘솔 인코딩을 UTF-8로 설정
+if (process.platform === 'win32') {
+  const { exec } = require('child_process');
+  exec('chcp 65001 >nul', (error) => {
+    if (error) {
+      // chcp 명령 실패 시 무시
+    }
+  });
+}
+
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
   if (process.env.NODE_ENV === 'production') {
