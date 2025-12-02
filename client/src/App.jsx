@@ -1529,7 +1529,7 @@ function App() {
             <div className="empty-state">프로젝트가 없습니다.</div>
           ) : (
             <div className={`project-grid ${sortMode ? 'sort-mode' : ''}`}>
-              {filteredProjects.map((project) => (
+              {[...filteredProjects].sort((a, b) => (b.number || 0) - (a.number || 0)).map((project) => (
                 <ProjectCard
                   key={project.id}
                   project={project}
