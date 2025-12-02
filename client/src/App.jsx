@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { FaStar, FaRegStar, FaPlus, FaTimes, FaEdit, FaTrash, FaFolder, FaSignInAlt, FaSignOutAlt, FaUserShield, FaCheck, FaChevronDown } from 'react-icons/fa'
+import { FaStar, FaRegStar, FaPlus, FaTimes, FaEdit, FaTrash, FaFolder, FaSignInAlt, FaSignOutAlt, FaUserShield, FaCheck, FaChevronDown, FaArrowsAlt, FaGripVertical } from 'react-icons/fa'
 import { signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth'
 import { auth, googleProvider } from './firebase'
 import {
@@ -48,6 +48,9 @@ function App() {
   const [isAllowed, setIsAllowed] = useState(false)
   const [showRecent, setShowRecent] = useState(true)
   const [showFavorites, setShowFavorites] = useState(true)
+  const [sortMode, setSortMode] = useState(false)
+  const [draggedProjectId, setDraggedProjectId] = useState(null)
+  const [draggedOverProjectId, setDraggedOverProjectId] = useState(null)
   const isInitialLoad = useRef(true)
 
   // 이메일 마스킹 함수
@@ -554,6 +557,89 @@ function App() {
     setEditingCategory(null)
     setEditingCategoryName('')
     setEditingCategoryColor('#667eea')
+  }
+
+  const handleDragStart = (e, projectId) => {
+    if (!sortMode) return
+    setDraggedProjectId(projectId)
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/html', projectId)
+  }
+
+  const handleDragOver = (e, projectId) => {
+    if (!sortMode || !draggedProjectId) return
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    setDraggedOverProjectId(projectId)
+  }
+
+  const handleDragLeave = () => {
+    setDraggedOverProjectId(null)
+  }
+
+  const handleDrop = async (e, targetProjectId) => {
+    e.preventDefault()
+    if (!sortMode || !draggedProjectId || draggedProjectId === targetProjectId) {
+      setDraggedProjectId(null)
+      setDraggedOverProjectId(null)
+      return
+    }
+
+    try {
+      // 전체 프로젝트 목록 사용 (카테고리 필터와 무관)
+      const allProjects = [...projects].sort((a, b) => (a.number || 0) - (b.number || 0))
+      
+      // 드래그한 프로젝트와 타겟 프로젝트의 인덱스 찾기
+      const draggedIndex = allProjects.findIndex(p => p.id === draggedProjectId)
+      const targetIndex = allProjects.findIndex(p => p.id === targetProjectId)
+      
+      if (draggedIndex === -1 || targetIndex === -1) return
+      
+      // 프로젝트 순서 변경
+      const [draggedProject] = allProjects.splice(draggedIndex, 1)
+      allProjects.splice(targetIndex, 0, draggedProject)
+      
+      // 새로운 번호 할당 (1부터 순차적으로)
+      const projectsToUpdate = allProjects.map((project, index) => ({
+        ...project,
+        newNumber: index + 1
+      }))
+      
+      // Firebase에 순서 업데이트 (변경된 프로젝트만)
+      const updatePromises = projectsToUpdate
+        .filter(p => p.number !== p.newNumber)
+        .map(project => updateProject(project.id, { number: project.newNumber }))
+      
+      await Promise.all(updatePromises)
+      
+      // 상태 초기화 (정렬 모드는 유지)
+      setDraggedProjectId(null)
+      setDraggedOverProjectId(null)
+      
+      // 프로젝트 목록 새로고침
+      loadProjects()
+      setMessage('프로젝트 순서가 변경되었습니다.')
+      setTimeout(() => setMessage(''), 2000)
+    } catch (error) {
+      console.error('Error reordering projects:', error)
+      setMessage('프로젝트 순서 변경에 실패했습니다.')
+      setDraggedProjectId(null)
+      setDraggedOverProjectId(null)
+    }
+  }
+
+  const handleDragEnd = () => {
+    setDraggedProjectId(null)
+    setDraggedOverProjectId(null)
+  }
+
+  const toggleSortMode = () => {
+    setSortMode(!sortMode)
+    if (sortMode) {
+      // 정렬 모드 종료 시 상태 초기화
+      setDraggedProjectId(null)
+      setDraggedOverProjectId(null)
+    }
   }
 
   const handleDeleteCategory = async (categoryName) => {
@@ -1102,11 +1188,23 @@ function App() {
         )}
 
         <section className="section">
-          <h2 className="section-title">All Projects</h2>
+          <div className="section-header">
+            <h2 className="section-title">All Projects</h2>
+            {isAllowed && filteredProjects.length > 0 && (
+              <button
+                className={`sort-mode-btn ${sortMode ? 'active' : ''}`}
+                onClick={toggleSortMode}
+                title={sortMode ? '정렬 모드 종료' : '순서 변경 모드'}
+                style={{ color: sortMode ? '#f44336' : selectedCategoryColor }}
+              >
+                {sortMode ? <FaTimes /> : <FaArrowsAlt />}
+              </button>
+            )}
+          </div>
           {filteredProjects.length === 0 ? (
             <div className="empty-state">프로젝트가 없습니다.</div>
           ) : (
-            <div className="project-grid">
+            <div className={`project-grid ${sortMode ? 'sort-mode' : ''}`}>
               {filteredProjects.map((project) => (
                 <ProjectCard
                   key={project.id}
@@ -1117,6 +1215,14 @@ function App() {
                   onEdit={handleEditProject}
                   onDelete={handleDeleteProject}
                   isAllowed={isAllowed}
+                  sortMode={sortMode}
+                  isDragged={draggedProjectId === project.id}
+                  isDraggedOver={draggedOverProjectId === project.id}
+                  onDragStart={handleDragStart}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                  onDragEnd={handleDragEnd}
                 />
               ))}
             </div>
@@ -1127,7 +1233,25 @@ function App() {
   )
 }
 
-function ProjectCard({ project, onOpen, onToggleFavorite, onEdit, onDelete, onRemoveRecent, isRecent, isAllowed, categories }) {
+function ProjectCard({ 
+  project, 
+  onOpen, 
+  onToggleFavorite, 
+  onEdit, 
+  onDelete, 
+  onRemoveRecent, 
+  isRecent, 
+  isAllowed, 
+  categories,
+  sortMode,
+  isDragged,
+  isDraggedOver,
+  onDragStart,
+  onDragOver,
+  onDragLeave,
+  onDrop,
+  onDragEnd
+}) {
   // 프로젝트 색상 또는 카테고리 색상 가져오기
   const getProjectColor = () => {
     if (project.color) {
@@ -1146,8 +1270,31 @@ function ProjectCard({ project, onOpen, onToggleFavorite, onEdit, onDelete, onRe
   
   const projectColor = getProjectColor()
   
+  // 정렬 모드일 때는 클릭 이벤트 비활성화
+  const handleCardClick = (e) => {
+    if (sortMode) {
+      e.preventDefault()
+      e.stopPropagation()
+      return
+    }
+    onOpen(project)
+  }
+  
   return (
-    <div className={`project-card ${!isAllowed ? 'not-allowed' : ''}`}>
+    <div 
+      className={`project-card ${!isAllowed ? 'not-allowed' : ''} ${sortMode ? 'draggable' : ''} ${isDragged ? 'dragging' : ''} ${isDraggedOver ? 'drag-over' : ''}`}
+      draggable={sortMode && isAllowed}
+      onDragStart={(e) => onDragStart?.(e, project.id)}
+      onDragOver={(e) => onDragOver?.(e, project.id)}
+      onDragLeave={onDragLeave}
+      onDrop={(e) => onDrop?.(e, project.id)}
+      onDragEnd={onDragEnd}
+    >
+      {sortMode && isAllowed && (
+        <div className="drag-handle">
+          <FaGripVertical />
+        </div>
+      )}
       <div className="project-header">
         <span 
           className="project-index"
@@ -1155,7 +1302,7 @@ function ProjectCard({ project, onOpen, onToggleFavorite, onEdit, onDelete, onRe
         >
           #{project.index}
         </span>
-        {isAllowed && (
+        {isAllowed && !sortMode && (
           <div className="project-actions">
             <button
               className={`favorite-btn ${project.isFavorite ? 'active' : ''}`}
@@ -1204,7 +1351,7 @@ function ProjectCard({ project, onOpen, onToggleFavorite, onEdit, onDelete, onRe
       </div>
       <div
         className="project-content"
-        onClick={() => onOpen(project)}
+        onClick={handleCardClick}
       >
         <h3 className="project-name">{project.name}</h3>
         <p className="project-path">{project.path}</p>

@@ -228,11 +228,42 @@
   margin-bottom: 2.5rem;
 }
 
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
 .section-title {
   color: white;
   font-size: 1.5rem;
-  margin-bottom: 1rem;
+  margin: 0;
   text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.sort-mode-btn {
+  background: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-size: 1.2rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: all 0.2s;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.sort-mode-btn:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.sort-mode-btn.active {
+  background: #ffebee;
+  color: #f44336;
 }
 
 .project-grid {
@@ -267,6 +298,57 @@
 .project-card:hover {
   transform: translateY(-4px);
   box-shadow: 0 8px 12px rgba(0, 0, 0, 0.15);
+}
+
+.project-card.draggable {
+  position: relative;
+  cursor: move;
+}
+
+.project-card.draggable:hover {
+  transform: none;
+}
+
+.project-card.dragging {
+  opacity: 0.5;
+  transform: scale(0.95);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.project-card.drag-over {
+  border: 2px dashed var(--theme-color, #667eea);
+  transform: scale(1.02);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+}
+
+.project-grid.sort-mode .project-card {
+  cursor: move;
+}
+
+.project-grid.sort-mode .project-card:hover {
+  transform: none;
+}
+
+.drag-handle {
+  position: absolute;
+  top: 0.5rem;
+  left: 0.5rem;
+  color: #999;
+  font-size: 1.2rem;
+  cursor: grab;
+  z-index: 10;
+  padding: 0.25rem;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 4px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+.project-card.draggable .project-content {
+  cursor: move;
 }
 
 .project-header {
