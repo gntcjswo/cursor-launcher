@@ -11,6 +11,9 @@ import {
   addCategory,
   updateCategory,
   deleteCategory,
+  addSubcategory,
+  updateSubcategory,
+  deleteSubcategory,
   getFavorites,
   toggleFavorite,
   getRecent,
@@ -38,16 +41,22 @@ function App() {
   const [newProjectName, setNewProjectName] = useState('')
   const [newProjectPath, setNewProjectPath] = useState('')
   const [newProjectCategory, setNewProjectCategory] = useState('')
+  const [newProjectSubcategory, setNewProjectSubcategory] = useState('')
   const [newProjectColor, setNewProjectColor] = useState('')
   const [newCategoryName, setNewCategoryName] = useState('')
   const [editingCategory, setEditingCategory] = useState(null)
   const [editingCategoryName, setEditingCategoryName] = useState('')
   const [editingCategoryColor, setEditingCategoryColor] = useState('#667eea')
   const [newCategoryColor, setNewCategoryColor] = useState('#667eea')
+  const [editingCategoryForSub, setEditingCategoryForSub] = useState(null)
+  const [newSubcategoryName, setNewSubcategoryName] = useState('')
+  const [editingSubcategory, setEditingSubcategory] = useState(null) // { categoryName, subcategoryName }
+  const [editingSubcategoryName, setEditingSubcategoryName] = useState('')
   const [user, setUser] = useState(null)
   const [isAllowed, setIsAllowed] = useState(false)
   const [showRecent, setShowRecent] = useState(true)
   const [showFavorites, setShowFavorites] = useState(true)
+  const [selectedSubcategories, setSelectedSubcategories] = useState([]) // 선택된 서브카테고리 목록
   const [sortMode, setSortMode] = useState(false)
   const [draggedProjectId, setDraggedProjectId] = useState(null)
   const [draggedOverProjectId, setDraggedOverProjectId] = useState(null)
@@ -195,7 +204,12 @@ function App() {
       setFavorites(favoritesData)
       
       if (!selectedCategory && categoriesData && categoriesData.length > 0) {
-        setSelectedCategory(categoriesData[0].name || categoriesData[0])
+        const firstCategory = categoriesData[0]
+        const firstCategoryName = typeof firstCategory === 'string' ? firstCategory : firstCategory.name
+        setSelectedCategory(firstCategoryName)
+        // 초기 로드 시 첫 번째 카테고리의 모든 서브카테고리를 기본값으로 선택
+        const subcategories = typeof firstCategory !== 'string' ? (firstCategory.subcategories || []) : []
+        setSelectedSubcategories(subcategories)
       }
       setLoading(false)
     } catch (error) {
@@ -356,6 +370,16 @@ function App() {
     setShowFavorites(checked)
   }
 
+  const handleSubcategoryToggle = (subcategoryName) => {
+    setSelectedSubcategories(prev => {
+      if (prev.includes(subcategoryName)) {
+        return prev.filter(sub => sub !== subcategoryName)
+      } else {
+        return [...prev, subcategoryName]
+      }
+    })
+  }
+
   const handleAddProject = async (e) => {
     e.preventDefault()
     
@@ -381,13 +405,15 @@ function App() {
         name: newProjectName.trim(),
         path: newProjectPath.trim(),
         category: newProjectCategory,
+        subcategory: newProjectSubcategory || null,
         color: newProjectColor || null
       })
 
       setMessage('프로젝트가 추가되었습니다.')
-      // 카테고리는 유지하고 프로젝트명, 경로, 색상만 비우기
+      // 카테고리는 유지하고 프로젝트명, 경로, 서브카테고리, 색상만 비우기
       setNewProjectName('')
       setNewProjectPath('')
+      setNewProjectSubcategory('')
       setNewProjectColor('')
       setShowAddModal(false)
       setTimeout(() => {
@@ -405,6 +431,7 @@ function App() {
     setNewProjectName(project.name)
     setNewProjectPath(project.path)
     setNewProjectCategory(project.category)
+    setNewProjectSubcategory(project.subcategory || '')
     setNewProjectColor(project.color || '')
     setShowEditModal(true)
   }
@@ -415,6 +442,7 @@ function App() {
     setNewProjectName('')
     setNewProjectPath('')
     setNewProjectCategory('')
+    setNewProjectSubcategory('')
     setNewProjectColor('')
   }
 
@@ -437,6 +465,7 @@ function App() {
         name: newProjectName.trim(),
         path: newProjectPath.trim(),
         category: newProjectCategory,
+        subcategory: newProjectSubcategory || null,
         color: newProjectColor || null
       })
 
@@ -446,6 +475,7 @@ function App() {
       setNewProjectName('')
       setNewProjectPath('')
       setNewProjectCategory('')
+      setNewProjectSubcategory('')
       setNewProjectColor('')
       setTimeout(() => {
         setMessage('')
@@ -557,6 +587,86 @@ function App() {
     setEditingCategory(null)
     setEditingCategoryName('')
     setEditingCategoryColor('#667eea')
+  }
+
+  const handleAddSubcategory = async (e, categoryName) => {
+    e.preventDefault()
+    if (!isAllowed) {
+      setMessage('권한이 없습니다. 허용된 계정으로 로그인해주세요.')
+      return
+    }
+    if (!newSubcategoryName.trim()) {
+      setMessage('서브카테고리명을 입력해주세요.')
+      return
+    }
+    try {
+      await addSubcategory(categoryName, newSubcategoryName.trim())
+      setMessage('서브카테고리가 추가되었습니다.')
+      setNewSubcategoryName('')
+      setEditingCategoryForSub(null)
+      loadProjects()
+      setTimeout(() => setMessage(''), 2000)
+    } catch (error) {
+      console.error('Error adding subcategory:', error)
+      setMessage('서브카테고리 추가에 실패했습니다: ' + (error.message || '알 수 없는 오류'))
+    }
+  }
+
+  const handleEditSubcategory = (categoryName, subcategoryName) => {
+    setEditingSubcategory({ categoryName, subcategoryName })
+    setEditingSubcategoryName(subcategoryName)
+  }
+
+  const handleUpdateSubcategory = async (e, categoryName, oldSubcategoryName) => {
+    e.preventDefault()
+    if (!isAllowed) {
+      setMessage('권한이 없습니다. 허용된 계정으로 로그인해주세요.')
+      return
+    }
+    if (!editingSubcategoryName.trim()) {
+      setMessage('서브카테고리명을 입력해주세요.')
+      return
+    }
+    if (editingSubcategoryName.trim() === oldSubcategoryName) {
+      setEditingSubcategory(null)
+      setEditingSubcategoryName('')
+      return
+    }
+    try {
+      await updateSubcategory(categoryName, oldSubcategoryName, editingSubcategoryName.trim())
+      setMessage('서브카테고리가 수정되었습니다.')
+      setEditingSubcategory(null)
+      setEditingSubcategoryName('')
+      loadProjects()
+      setTimeout(() => setMessage(''), 2000)
+    } catch (error) {
+      console.error('Error updating subcategory:', error)
+      setMessage('서브카테고리 수정에 실패했습니다: ' + (error.message || '알 수 없는 오류'))
+    }
+  }
+
+  const handleCancelEditSubcategory = () => {
+    setEditingSubcategory(null)
+    setEditingSubcategoryName('')
+  }
+
+  const handleDeleteSubcategory = async (categoryName, subcategoryName) => {
+    if (!isAllowed) {
+      setMessage('권한이 없습니다. 허용된 계정으로 로그인해주세요.')
+      return
+    }
+    if (!confirm(`"${subcategoryName}" 서브카테고리를 삭제하시겠습니까?`)) {
+      return
+    }
+    try {
+      await deleteSubcategory(categoryName, subcategoryName)
+      setMessage('서브카테고리가 삭제되었습니다.')
+      loadProjects()
+      setTimeout(() => setMessage(''), 2000)
+    } catch (error) {
+      console.error('Error deleting subcategory:', error)
+      setMessage('서브카테고리 삭제에 실패했습니다.')
+    }
   }
 
   const handleDragStart = (e, projectId) => {
@@ -681,9 +791,36 @@ function App() {
     }
   }
 
-  const filteredProjects = selectedCategory
+  const filteredProjects = (selectedCategory
     ? projects.filter(p => p.category === selectedCategory)
     : projects
+  ).filter(p => {
+    // 서브카테고리 필터 적용
+    // 선택된 카테고리의 서브카테고리 목록 가져오기
+    const selectedCat = categories.find(c => {
+      const catName = typeof c === 'string' ? c : c.name
+      return catName === selectedCategory
+    })
+    const availableSubcategories = selectedCat && typeof selectedCat !== 'string' ? (selectedCat.subcategories || []) : []
+    
+    // 서브카테고리가 없는 카테고리면 모든 프로젝트 표시
+    if (availableSubcategories.length === 0) {
+      return true
+    }
+    
+    // 선택된 서브카테고리가 없으면 아무것도 표시하지 않음
+    if (selectedSubcategories.length === 0) {
+      return false
+    }
+    
+    // 서브카테고리가 없는 프로젝트는 필터에서 제외
+    if (!p.subcategory) {
+      return false
+    }
+    
+    // 선택된 서브카테고리에 포함된 프로젝트만 표시
+    return selectedSubcategories.includes(p.subcategory)
+  })
 
   // Recent 프로젝트를 recent 배열의 순서대로 정렬 (가장 최근 것이 먼저)
   const recentProjects = recent
@@ -800,7 +937,16 @@ function App() {
               <button
                 key={categoryName || `category-${index}`}
                 className={`tab ${selectedCategory === categoryName ? 'active' : ''}`}
-                onClick={() => setSelectedCategory(categoryName)}
+                onClick={() => {
+                  setSelectedCategory(categoryName)
+                  // 카테고리 변경 시 해당 카테고리의 모든 서브카테고리를 기본값으로 선택
+                  const selectedCat = categories.find(c => {
+                    const catName = typeof c === 'string' ? c : c.name
+                    return catName === categoryName
+                  })
+                  const subcategories = selectedCat && typeof selectedCat !== 'string' ? (selectedCat.subcategories || []) : []
+                  setSelectedSubcategories(subcategories) // 모든 서브카테고리를 기본값으로 선택
+                }}
                 style={{
                   '--tab-theme-color': categoryColor,
                   ...(selectedCategory === categoryName && {
@@ -840,6 +986,31 @@ function App() {
               Favorites
             </span>
           </label>
+          {/* 서브카테고리 필터 */}
+          {selectedCategory && (() => {
+            const selectedCat = categories.find(c => {
+              const catName = typeof c === 'string' ? c : c.name
+              return catName === selectedCategory
+            })
+            const subcategories = selectedCat && typeof selectedCat !== 'string' ? (selectedCat.subcategories || []) : []
+            return subcategories.length > 0 && (
+              <>
+                {subcategories.map(sub => (
+                  <label key={sub} className="checkbox-label checkbox-label--sub-category">
+                    <input
+                      type="checkbox"
+                      checked={selectedSubcategories.includes(sub)}
+                      onChange={() => handleSubcategoryToggle(sub)}
+                    />
+                    <span>
+                      <FaCheck className="checkbox-icon" />
+                      {sub}
+                    </span>
+                  </label>
+                ))}
+              </>
+            )
+          })()}
         </div>
 
         {/* 프로젝트 추가 모달 */}
@@ -885,7 +1056,10 @@ function App() {
                   <div className="select-wrapper">
                     <select
                       value={newProjectCategory}
-                      onChange={(e) => setNewProjectCategory(e.target.value)}
+                      onChange={(e) => {
+                        setNewProjectCategory(e.target.value)
+                        setNewProjectSubcategory('') // 카테고리 변경 시 서브카테고리 초기화
+                      }}
                     >
                       {categories.map(cat => {
                         const catName = typeof cat === 'string' ? cat : cat.name
@@ -895,6 +1069,30 @@ function App() {
                     <FaChevronDown className="select-arrow" />
                   </div>
                 </div>
+                {newProjectCategory && (() => {
+                  const selectedCat = categories.find(c => {
+                    const catName = typeof c === 'string' ? c : c.name
+                    return catName === newProjectCategory
+                  })
+                  const subcategories = selectedCat && typeof selectedCat !== 'string' ? (selectedCat.subcategories || []) : []
+                  return subcategories.length > 0 && (
+                    <div className="form-group">
+                      <label>서브카테고리 (선택사항)</label>
+                      <div className="select-wrapper">
+                        <select
+                          value={newProjectSubcategory}
+                          onChange={(e) => setNewProjectSubcategory(e.target.value)}
+                        >
+                          <option value="">없음</option>
+                          {subcategories.map(sub => (
+                            <option key={sub} value={sub}>{sub}</option>
+                          ))}
+                        </select>
+                        <FaChevronDown className="select-arrow" />
+                      </div>
+                    </div>
+                  )
+                })()}
                 <div className="form-group">
                   <label>프로젝트 색상 (선택사항)</label>
                   <div className="color-input-wrapper">
@@ -932,6 +1130,7 @@ function App() {
                     onClick={() => {
                       setNewProjectName('')
                       setNewProjectPath('')
+                      setNewProjectSubcategory('')
                       setNewProjectColor('')
                       setShowAddModal(false)
                     }}
@@ -981,7 +1180,10 @@ function App() {
                   <div className="select-wrapper">
                     <select
                       value={newProjectCategory}
-                      onChange={(e) => setNewProjectCategory(e.target.value)}
+                      onChange={(e) => {
+                        setNewProjectCategory(e.target.value)
+                        setNewProjectSubcategory('') // 카테고리 변경 시 서브카테고리 초기화
+                      }}
                     >
                       {categories.map(cat => {
                         const catName = typeof cat === 'string' ? cat : cat.name
@@ -991,6 +1193,30 @@ function App() {
                     <FaChevronDown className="select-arrow" />
                   </div>
                 </div>
+                {newProjectCategory && (() => {
+                  const selectedCat = categories.find(c => {
+                    const catName = typeof c === 'string' ? c : c.name
+                    return catName === newProjectCategory
+                  })
+                  const subcategories = selectedCat && typeof selectedCat !== 'string' ? (selectedCat.subcategories || []) : []
+                  return subcategories.length > 0 && (
+                    <div className="form-group">
+                      <label>서브카테고리 (선택사항)</label>
+                      <div className="select-wrapper">
+                        <select
+                          value={newProjectSubcategory}
+                          onChange={(e) => setNewProjectSubcategory(e.target.value)}
+                        >
+                          <option value="">없음</option>
+                          {subcategories.map(sub => (
+                            <option key={sub} value={sub}>{sub}</option>
+                          ))}
+                        </select>
+                        <FaChevronDown className="select-arrow" />
+                      </div>
+                    </div>
+                  )
+                })()}
                 <div className="form-group">
                   <label>프로젝트 색상 (선택사항)</label>
                   <div className="color-input-wrapper">
@@ -1105,35 +1331,133 @@ function App() {
                         </form>
                       ) : (
                         <>
-                          <div className="category-info">
-                            <span 
-                              className="category-color-indicator"
-                              style={{ backgroundColor: categoryColor }}
-                            ></span>
-                            <span>{categoryName}</span>
+                          <div className="category-main">
+                            <div className="category-info">
+                              <span 
+                                className="category-color-indicator"
+                                style={{ backgroundColor: categoryColor }}
+                              ></span>
+                              <span>{categoryName}</span>
+                            </div>
+                            <div className="category-actions">
+                              <button
+                                className="edit-btn"
+                                onClick={() => handleEditCategory(category)}
+                                title="수정"
+                              >
+                                <FaEdit />
+                              </button>
+                              <button
+                                className="delete-btn"
+                                onClick={() => handleDeleteCategory(categoryName)}
+                                disabled={index === 0 || projects.some(p => p.category === categoryName)}
+                                title={
+                                  index === 0 
+                                    ? '첫 번째 카테고리는 삭제할 수 없습니다' 
+                                    : projects.some(p => p.category === categoryName) 
+                                      ? '프로젝트가 있는 카테고리는 삭제할 수 없습니다' 
+                                      : '삭제'
+                                }
+                              >
+                                <FaTrash />
+                              </button>
+                            </div>
                           </div>
-                          <div className="category-actions">
-                            <button
-                              className="edit-btn"
-                              onClick={() => handleEditCategory(category)}
-                              title="수정"
-                            >
-                              <FaEdit />
-                            </button>
-                            <button
-                              className="delete-btn"
-                              onClick={() => handleDeleteCategory(categoryName)}
-                              disabled={index === 0 || projects.some(p => p.category === categoryName)}
-                              title={
-                                index === 0 
-                                  ? '첫 번째 카테고리는 삭제할 수 없습니다' 
-                                  : projects.some(p => p.category === categoryName) 
-                                    ? '프로젝트가 있는 카테고리는 삭제할 수 없습니다' 
-                                    : '삭제'
-                              }
-                            >
-                              <FaTrash />
-                            </button>
+                          {/* 서브카테고리 목록 및 추가 */}
+                          <div className="subcategories-section">
+                            {(() => {
+                              const subcategories = typeof category !== 'string' ? (category.subcategories || []) : []
+                              return (
+                                <>
+                                  {subcategories.length > 0 && (
+                                    <div className="subcategories-list">
+                                      {subcategories.map(sub => {
+                                        const isEditing = editingSubcategory?.categoryName === categoryName && editingSubcategory?.subcategoryName === sub
+                                        return (
+                                          <div key={sub} className="subcategory-item">
+                                            {isEditing ? (
+                                              <form 
+                                                className="subcategory-edit-form"
+                                                onSubmit={(e) => handleUpdateSubcategory(e, categoryName, sub)}
+                                              >
+                                                <input
+                                                  type="text"
+                                                  value={editingSubcategoryName}
+                                                  onChange={(e) => setEditingSubcategoryName(e.target.value)}
+                                                  autoFocus
+                                                  className="subcategory-edit-input"
+                                                />
+                                                <button type="submit" className="save-btn" title="저장">
+                                                  <FaCheck />
+                                                </button>
+                                                <button 
+                                                  type="button" 
+                                                  onClick={handleCancelEditSubcategory} 
+                                                  className="cancel-btn"
+                                                  title="취소"
+                                                >
+                                                  <FaTimes />
+                                                </button>
+                                              </form>
+                                            ) : (
+                                              <>
+                                                <span className="subcategory-name">{sub}</span>
+                                                <div className="subcategory-actions">
+                                                  <button
+                                                    className="edit-btn"
+                                                    onClick={() => handleEditSubcategory(categoryName, sub)}
+                                                    title="수정"
+                                                  >
+                                                    <FaEdit />
+                                                  </button>
+                                                  <button
+                                                    className="delete-btn"
+                                                    onClick={() => handleDeleteSubcategory(categoryName, sub)}
+                                                    title="서브카테고리 삭제"
+                                                  >
+                                                    <FaTimes />
+                                                  </button>
+                                                </div>
+                                              </>
+                                            )}
+                                          </div>
+                                        )
+                                      })}
+                                    </div>
+                                  )}
+                                  <form 
+                                    className="subcategory-add-form"
+                                    onSubmit={(e) => handleAddSubcategory(e, categoryName)}
+                                  >
+                                    <input
+                                      type="text"
+                                      value={editingCategoryForSub === categoryName ? newSubcategoryName : ''}
+                                      onChange={(e) => setNewSubcategoryName(e.target.value)}
+                                      onFocus={() => setEditingCategoryForSub(categoryName)}
+                                      onBlur={(e) => {
+                                        // submit 버튼 클릭 시에는 blur 무시
+                                        if (e.relatedTarget && e.relatedTarget.type === 'submit') {
+                                          return
+                                        }
+                                        setTimeout(() => {
+                                          if (editingCategoryForSub === categoryName && !newSubcategoryName.trim()) {
+                                            setEditingCategoryForSub(null)
+                                            setNewSubcategoryName('')
+                                          }
+                                        }, 200)
+                                      }}
+                                      placeholder="서브카테고리 추가..."
+                                      className="subcategory-input"
+                                    />
+                                    {editingCategoryForSub === categoryName && newSubcategoryName.trim() && (
+                                      <button type="submit" className="add-btn-small" title="추가">
+                                        <FaPlus />
+                                      </button>
+                                    )}
+                                  </form>
+                                </>
+                              )
+                            })()}
                           </div>
                         </>
                       )}
@@ -1355,12 +1679,14 @@ function ProjectCard({
       >
         <h3 className="project-name">{project.name}</h3>
         <p className="project-path">{project.path}</p>
-        <span 
-          className="project-category"
-          style={{ backgroundColor: projectColor }}
-        >
-          {project.category}
-        </span>
+        {project.subcategory && (
+          <span 
+            className="project-category"
+            style={{ backgroundColor: projectColor }}
+          >
+            {project.subcategory}
+          </span>
+        )}
       </div>
     </div>
   )

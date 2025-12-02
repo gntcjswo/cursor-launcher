@@ -150,7 +150,8 @@ export const getCategories = async () => {
 			return {
 				id: doc.id,
 				name: data.name || data.category || doc.id,
-				color: data.color || '#667eea' // 기본 색상
+				color: data.color || '#667eea', // 기본 색상
+				subcategories: data.subcategories || [] // 서브카테고리 배열
 			}
 		}).filter(cat => cat.name)
 
@@ -223,6 +224,116 @@ export const deleteCategory = async (categoryName) => {
 	categoriesSnapshot.docs.forEach(async (doc) => {
 		await deleteDoc(doc.ref)
 	})
+}
+
+// 서브카테고리 관련
+export const addSubcategory = async (categoryName, subcategoryName) => {
+	try {
+		const categoriesSnapshot = await getDocs(
+			query(collection(db, CATEGORIES_COLLECTION), where('name', '==', categoryName))
+		)
+		
+		if (categoriesSnapshot.empty) {
+			throw new Error('Category not found')
+		}
+		
+		const updatePromises = categoriesSnapshot.docs.map(async (doc) => {
+			const data = doc.data()
+			const subcategories = data.subcategories || []
+			
+			// 중복 확인
+			if (subcategories.includes(subcategoryName)) {
+				throw new Error('Subcategory already exists')
+			}
+			
+			await updateDoc(doc.ref, {
+				subcategories: [...subcategories, subcategoryName]
+			})
+		})
+		
+		await Promise.all(updatePromises)
+	} catch (error) {
+		console.error('Error adding subcategory:', error)
+		throw error
+	}
+}
+
+export const updateSubcategory = async (categoryName, oldSubcategoryName, newSubcategoryName) => {
+	try {
+		const categoriesSnapshot = await getDocs(
+			query(collection(db, CATEGORIES_COLLECTION), where('name', '==', categoryName))
+		)
+		
+		const updatePromises = categoriesSnapshot.docs.map(async (doc) => {
+			const data = doc.data()
+			const subcategories = (data.subcategories || []).map(sub => 
+				sub === oldSubcategoryName ? newSubcategoryName : sub
+			)
+			
+			await updateDoc(doc.ref, {
+				subcategories: subcategories
+			})
+		})
+		
+		await Promise.all(updatePromises)
+		
+		// 해당 서브카테고리를 사용하는 프로젝트들의 subcategory 필드도 업데이트
+		const projectsSnapshot = await getDocs(
+			query(collection(db, PROJECTS_COLLECTION), where('category', '==', categoryName))
+		)
+		
+		const projectUpdatePromises = projectsSnapshot.docs.map(async (doc) => {
+			const projectData = doc.data()
+			if (projectData.subcategory === oldSubcategoryName) {
+				await updateDoc(doc.ref, {
+					subcategory: newSubcategoryName
+				})
+			}
+		})
+		
+		await Promise.all(projectUpdatePromises)
+	} catch (error) {
+		console.error('Error updating subcategory:', error)
+		throw error
+	}
+}
+
+export const deleteSubcategory = async (categoryName, subcategoryName) => {
+	try {
+		const categoriesSnapshot = await getDocs(
+			query(collection(db, CATEGORIES_COLLECTION), where('name', '==', categoryName))
+		)
+		
+		const updatePromises = categoriesSnapshot.docs.map(async (doc) => {
+			const data = doc.data()
+			const subcategories = (data.subcategories || []).filter(sub => sub !== subcategoryName)
+			
+			await updateDoc(doc.ref, {
+				subcategories: subcategories
+			})
+		})
+		
+		await Promise.all(updatePromises)
+		
+		// 해당 서브카테고리를 사용하는 프로젝트들의 subcategory 필드를 제거
+		const projectsSnapshot = await getDocs(
+			query(collection(db, PROJECTS_COLLECTION), where('category', '==', categoryName))
+		)
+		
+		const projectUpdatePromises = projectsSnapshot.docs.map(async (doc) => {
+			const projectData = doc.data()
+			if (projectData.subcategory === subcategoryName) {
+				await updateDoc(doc.ref, {
+					subcategory: null
+				})
+			}
+		})
+		
+		await Promise.all(projectUpdatePromises)
+	} catch (error) {
+		console.error('Error deleting subcategory:', error)
+		throw error
+	}
 }
 
 // 즐겨찾기 관련
