@@ -229,30 +229,52 @@ function App() {
       // 최근 목록에 추가
       await addRecent(project.name)
 
-      // Cursor 실행 (백엔드 API 사용)
-      const response = await fetch('http://localhost:3001/api/open', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          projectPath: project.path,
-          projectName: project.name,
-        }),
-      })
+      // API URL 설정 (환경 변수 또는 기본값)
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+      
+      // 백엔드 API 호출 시도
+      try {
+        const response = await fetch(`${apiUrl}/api/open`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            projectPath: project.path,
+            projectName: project.name,
+          }),
+        })
 
-      if (response.ok) {
-        setMessage(`${project.name} 프로젝트를 열었습니다.`)
+        if (response.ok) {
+          setMessage(`${project.name} 프로젝트를 열었습니다.`)
+          setTimeout(() => {
+            setMessage('')
+            loadProjects()
+          }, 1000)
+          return
+        } else {
+          throw new Error('API 응답 오류')
+        }
+      } catch (apiError) {
+        // API 호출 실패 시 (백엔드 서버가 실행되지 않은 경우)
+        console.warn('백엔드 서버에 연결할 수 없습니다. 경로를 클립보드에 복사합니다.', apiError)
+        
+        // 경로를 클립보드에 복사
+        try {
+          await navigator.clipboard.writeText(project.path)
+          setMessage(`${project.name} 프로젝트 경로가 클립보드에 복사되었습니다.\n\n백엔드 서버가 실행 중이 아닙니다. Cursor에서 직접 열어주세요.\n경로: ${project.path}`)
+        } catch (clipboardError) {
+          // 클립보드 복사 실패 시 경로를 표시
+          setMessage(`${project.name} 프로젝트 경로: ${project.path}\n\n백엔드 서버가 실행 중이 아닙니다. Cursor에서 직접 열어주세요.`)
+        }
         setTimeout(() => {
           setMessage('')
           loadProjects()
-        }, 1000)
-      } else {
-        setMessage('프로젝트를 여는데 실패했습니다.')
+        }, 4000)
       }
     } catch (error) {
       console.error('Error opening project:', error)
-      setMessage('프로젝트를 여는데 실패했습니다.')
+      setMessage(`프로젝트를 여는데 실패했습니다: ${error.message}`)
     }
   }
 
