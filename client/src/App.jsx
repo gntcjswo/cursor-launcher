@@ -847,7 +847,7 @@ function App() {
       }}
     >
       <div className="container">
-          <div className="loading">로딩 중...</div>
+          <div className="loading"><span>로딩 중...</span></div>
         </div>
       </div>
     )

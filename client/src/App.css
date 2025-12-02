@@ -239,10 +239,53 @@
 }
 
 .loading {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   text-align: center;
   color: white;
   font-size: 1.5rem;
   padding: 3rem;
+}
+
+.loading span {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.loading::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 2.5rem;
+  height: 2.5rem;
+  margin: -1.25rem 0 0 -1.25rem;
+  border-radius: 50%;
+  border: 0.25rem solid rgba(199, 199, 199, 0.25);
+  border-top-color: #fff;
+  animation: loading-spinner 0.9s 
+linear infinite;
+  box-shadow: 0 0 2rem rgba(0, 0, 0, 0.05);
+  pointer-events: none;
+}
+
+@keyframes loading-spinner {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 .section {
