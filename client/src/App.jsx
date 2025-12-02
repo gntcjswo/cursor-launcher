@@ -1111,7 +1111,7 @@ function App() {
                   <div className="color-input-wrapper">
                     <input
                       type="color"
-                      value={newProjectColor || '#667eea'}
+                      value={newProjectColor || selectedCategoryColor}
                       onChange={(e) => setNewProjectColor(e.target.value)}
                       className="color-picker"
                       title="색상 선택"
@@ -1120,7 +1120,7 @@ function App() {
                       type="text"
                       value={newProjectColor || ''}
                       onChange={(e) => setNewProjectColor(e.target.value)}
-                      placeholder="#667eea"
+                      placeholder={selectedCategoryColor}
                       className="color-text-input"
                       pattern="^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$"
                     />
@@ -1233,21 +1233,34 @@ function App() {
                 <div className="form-group">
                   <label>프로젝트 색상 (선택사항)</label>
                   <div className="color-input-wrapper">
-                    <input
-                      type="color"
-                      value={newProjectColor || '#667eea'}
-                      onChange={(e) => setNewProjectColor(e.target.value)}
-                      className="color-picker"
-                      title="색상 선택"
-                    />
-                    <input
-                      type="text"
-                      value={newProjectColor || ''}
-                      onChange={(e) => setNewProjectColor(e.target.value)}
-                      placeholder="카테고리 색상 사용 (비워두면 기본값)"
-                      className="color-text-input"
-                      pattern="^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$"
-                    />
+                    {(() => {
+                      const addModalCategory = categories.find(c => {
+                        const catName = typeof c === 'string' ? c : c.name
+                        return catName === newProjectCategory
+                      })
+                      const addModalCategoryColor = addModalCategory 
+                        ? (typeof addModalCategory === 'string' ? '#667eea' : (addModalCategory.color || '#667eea'))
+                        : '#667eea'
+                      return (
+                        <>
+                          <input
+                            type="color"
+                            value={newProjectColor || addModalCategoryColor}
+                            onChange={(e) => setNewProjectColor(e.target.value)}
+                            className="color-picker"
+                            title="색상 선택"
+                          />
+                          <input
+                            type="text"
+                            value={newProjectColor || ''}
+                            onChange={(e) => setNewProjectColor(e.target.value)}
+                            placeholder={addModalCategoryColor}
+                            className="color-text-input"
+                            pattern="^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$"
+                          />
+                        </>
+                      )
+                    })()}
                     {newProjectColor && (
                       <button
                         type="button"
