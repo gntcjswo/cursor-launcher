@@ -38,6 +38,7 @@ function App() {
   const [newProjectName, setNewProjectName] = useState('')
   const [newProjectPath, setNewProjectPath] = useState('')
   const [newProjectCategory, setNewProjectCategory] = useState('')
+  const [newProjectColor, setNewProjectColor] = useState('')
   const [newCategoryName, setNewCategoryName] = useState('')
   const [editingCategory, setEditingCategory] = useState(null)
   const [editingCategoryName, setEditingCategoryName] = useState('')
@@ -376,13 +377,15 @@ function App() {
       await addProject({
         name: newProjectName.trim(),
         path: newProjectPath.trim(),
-        category: newProjectCategory
+        category: newProjectCategory,
+        color: newProjectColor || null
       })
 
       setMessage('프로젝트가 추가되었습니다.')
-      // 카테고리는 유지하고 프로젝트명과 경로만 비우기
+      // 카테고리는 유지하고 프로젝트명, 경로, 색상만 비우기
       setNewProjectName('')
       setNewProjectPath('')
+      setNewProjectColor('')
       setShowAddModal(false)
       setTimeout(() => {
         setMessage('')
@@ -399,6 +402,7 @@ function App() {
     setNewProjectName(project.name)
     setNewProjectPath(project.path)
     setNewProjectCategory(project.category)
+    setNewProjectColor(project.color || '')
     setShowEditModal(true)
   }
 
@@ -408,6 +412,7 @@ function App() {
     setNewProjectName('')
     setNewProjectPath('')
     setNewProjectCategory('')
+    setNewProjectColor('')
   }
 
   const handleUpdateProject = async (e) => {
@@ -428,7 +433,8 @@ function App() {
       await updateProject(editingProject.id, {
         name: newProjectName.trim(),
         path: newProjectPath.trim(),
-        category: newProjectCategory
+        category: newProjectCategory,
+        color: newProjectColor || null
       })
 
       setMessage('프로젝트가 수정되었습니다.')
@@ -437,6 +443,7 @@ function App() {
       setNewProjectName('')
       setNewProjectPath('')
       setNewProjectCategory('')
+      setNewProjectColor('')
       setTimeout(() => {
         setMessage('')
         loadProjects()
@@ -656,6 +663,7 @@ function App() {
                         setEditingProject(null)
                         setNewProjectName('')
                         setNewProjectPath('')
+                        setNewProjectColor('')
                         // 카테고리는 마지막 선택한 것을 유지 (또는 현재 선택된 카테고리)
                         if (!newProjectCategory) {
                           const firstCategory = categories[0]
@@ -759,6 +767,7 @@ function App() {
                   onClick={() => {
                     setNewProjectName('')
                     setNewProjectPath('')
+                    setNewProjectColor('')
                     setShowAddModal(false)
                   }}
                 >
@@ -800,12 +809,44 @@ function App() {
                     <FaChevronDown className="select-arrow" />
                   </div>
                 </div>
+                <div className="form-group">
+                  <label>프로젝트 색상 (선택사항)</label>
+                  <div className="color-input-wrapper">
+                    <input
+                      type="color"
+                      value={newProjectColor || '#667eea'}
+                      onChange={(e) => setNewProjectColor(e.target.value)}
+                      className="color-picker"
+                      title="색상 선택"
+                    />
+                    <input
+                      type="text"
+                      value={newProjectColor || ''}
+                      onChange={(e) => setNewProjectColor(e.target.value)}
+                      placeholder="#667eea"
+                      className="color-text-input"
+                      pattern="^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$"
+                    />
+                    {newProjectColor && (
+                      <button
+                        type="button"
+                        onClick={() => setNewProjectColor('')}
+                        className="color-clear-btn"
+                        title="색상 제거"
+                      >
+                        <FaTimes />
+                      </button>
+                    )}
+                  </div>
+                  <p className="form-help-text">색상을 지정하지 않으면 카테고리의 테마 색상이 사용됩니다.</p>
+                </div>
                 <div className="form-actions">
                   <button 
                     type="button" 
                     onClick={() => {
                       setNewProjectName('')
                       setNewProjectPath('')
+                      setNewProjectColor('')
                       setShowAddModal(false)
                     }}
                   >
@@ -863,6 +904,37 @@ function App() {
                     </select>
                     <FaChevronDown className="select-arrow" />
                   </div>
+                </div>
+                <div className="form-group">
+                  <label>프로젝트 색상 (선택사항)</label>
+                  <div className="color-input-wrapper">
+                    <input
+                      type="color"
+                      value={newProjectColor || '#667eea'}
+                      onChange={(e) => setNewProjectColor(e.target.value)}
+                      className="color-picker"
+                      title="색상 선택"
+                    />
+                    <input
+                      type="text"
+                      value={newProjectColor || ''}
+                      onChange={(e) => setNewProjectColor(e.target.value)}
+                      placeholder="카테고리 색상 사용 (비워두면 기본값)"
+                      className="color-text-input"
+                      pattern="^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$"
+                    />
+                    {newProjectColor && (
+                      <button
+                        type="button"
+                        onClick={() => setNewProjectColor('')}
+                        className="color-clear-btn"
+                        title="색상 제거"
+                      >
+                        <FaTimes />
+                      </button>
+                    )}
+                  </div>
+                  <p className="form-help-text">색상을 지정하지 않으면 카테고리의 테마 색상이 사용됩니다.</p>
                 </div>
                 <div className="form-actions">
                   <button type="button" onClick={handleCancelEditProject}>
@@ -995,6 +1067,7 @@ function App() {
                 <ProjectCard
                   key={project.id}
                   project={project}
+                  categories={categories}
                   onOpen={handleOpenProject}
                   onToggleFavorite={handleToggleFavorite}
                   onEdit={handleEditProject}
@@ -1016,6 +1089,7 @@ function App() {
                 <ProjectCard
                   key={project.id}
                   project={project}
+                  categories={categories}
                   onOpen={handleOpenProject}
                   onToggleFavorite={handleToggleFavorite}
                   onEdit={handleEditProject}
@@ -1037,6 +1111,7 @@ function App() {
                 <ProjectCard
                   key={project.id}
                   project={project}
+                  categories={categories}
                   onOpen={handleOpenProject}
                   onToggleFavorite={handleToggleFavorite}
                   onEdit={handleEditProject}
@@ -1052,11 +1127,34 @@ function App() {
   )
 }
 
-function ProjectCard({ project, onOpen, onToggleFavorite, onEdit, onDelete, onRemoveRecent, isRecent, isAllowed }) {
+function ProjectCard({ project, onOpen, onToggleFavorite, onEdit, onDelete, onRemoveRecent, isRecent, isAllowed, categories }) {
+  // 프로젝트 색상 또는 카테고리 색상 가져오기
+  const getProjectColor = () => {
+    if (project.color) {
+      return project.color
+    }
+    // 카테고리 색상 찾기
+    const categoryData = categories?.find(c => {
+      const catName = typeof c === 'string' ? c : c.name
+      return catName === project.category
+    })
+    if (categoryData) {
+      return typeof categoryData === 'string' ? '#667eea' : (categoryData.color || '#667eea')
+    }
+    return '#667eea'
+  }
+  
+  const projectColor = getProjectColor()
+  
   return (
     <div className={`project-card ${!isAllowed ? 'not-allowed' : ''}`}>
       <div className="project-header">
-        <span className="project-index">#{project.index}</span>
+        <span 
+          className="project-index"
+          style={{ backgroundColor: projectColor }}
+        >
+          #{project.index}
+        </span>
         {isAllowed && (
           <div className="project-actions">
             <button
@@ -1110,7 +1208,12 @@ function ProjectCard({ project, onOpen, onToggleFavorite, onEdit, onDelete, onRe
       >
         <h3 className="project-name">{project.name}</h3>
         <p className="project-path">{project.path}</p>
-        <span className="project-category">{project.category}</span>
+        <span 
+          className="project-category"
+          style={{ backgroundColor: projectColor }}
+        >
+          {project.category}
+        </span>
       </div>
     </div>
   )

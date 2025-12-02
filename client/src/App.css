@@ -439,6 +439,10 @@
   font-size: 1rem;
   transition: border-color 0.2s;
 }
+.form-group input.color-text-input {
+  width: 5.625rem;
+  text-align: center;
+}
 
 .form-group input:focus {
   outline: none;
@@ -662,5 +666,52 @@
 .color-picker::-moz-color-swatch {
   border: none;
   border-radius: 4px;
+}
+
+.color-input-wrapper {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.color-text-input {
+  flex: 1;
+  padding: 0.75rem;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 1rem;
+  transition: border-color 0.2s;
+  font-family: monospace;
+}
+
+.color-text-input:focus {
+  outline: none;
+  border-color: var(--theme-color, #667eea);
+}
+
+.color-clear-btn {
+  background: #f5f5f5;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 0.5rem;
+  cursor: pointer;
+  color: #666;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.color-clear-btn:hover {
+  background: #ffebee;
+  border-color: #f44336;
+  color: #f44336;
+}
+
+.form-help-text {
+  margin-top: 0.5rem;
+  font-size: 0.875rem;
+  color: #666;
+  font-style: italic;
 }
 
