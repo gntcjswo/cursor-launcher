@@ -889,13 +889,13 @@ function App() {
 
   const toggleCopyMode = () => {
     if (copyMode && selectedProjectsForCopy.length > 0) {
-      // 카피 모드 종료 시 선택된 프로젝트가 있으면 카피 모달 표시
+      // 복사 모드 종료 시 선택된 프로젝트가 있으면 복사 모달 표시
       setShowCopyModal(true)
     } else {
-      // 카피 모드 토글
+      // 복사 모드 토글
       setCopyMode(!copyMode)
       if (copyMode) {
-        // 카피 모드 종료 시 선택 초기화
+        // 복사 모드 종료 시 선택 초기화
         setSelectedProjectsForCopy([])
       }
     }
@@ -909,6 +909,39 @@ function App() {
         return [...prev, projectId]
       }
     })
+  }
+
+  // 복사 모달에서 서브카테고리 수정 핸들러
+  const handleCopyModalUpdateSubcategory = async (oldSubcategoryName) => {
+    if (!copyEditingSubcategoryName.trim()) return
+    try {
+      await updateSubcategory(copyTargetCategory, oldSubcategoryName, copyEditingSubcategoryName.trim())
+      setMessage('서브카테고리가 수정되었습니다.')
+      const updatedCategories = await getCategories()
+      setCategories(updatedCategories)
+      setCopyEditingSubcategory(null)
+      setCopyEditingSubcategoryName('')
+      setTimeout(() => setMessage(''), 2000)
+    } catch (error) {
+      console.error('Error updating subcategory:', error)
+      setMessage('서브카테고리 수정에 실패했습니다.')
+    }
+  }
+
+  // 복사 모달에서 서브카테고리 추가 핸들러
+  const handleCopyModalAddSubcategory = async () => {
+    if (!copyNewSubcategoryName.trim()) return
+    try {
+      await addSubcategory(copyTargetCategory, copyNewSubcategoryName.trim())
+      setMessage('서브카테고리가 추가되었습니다.')
+      const updatedCategories = await getCategories()
+      setCategories(updatedCategories)
+      setCopyNewSubcategoryName('')
+      setTimeout(() => setMessage(''), 2000)
+    } catch (error) {
+      console.error('Error adding subcategory:', error)
+      setMessage('서브카테고리 추가에 실패했습니다.')
+    }
   }
 
   const handleCopyProjects = async () => {
@@ -925,7 +958,10 @@ function App() {
     try {
       const allProjects = await getProjects()
       const projectsToCopy = projects.filter(p => selectedProjectsForCopy.includes(p.id))
-      const existingProjectNames = allProjects.map(p => p.name)
+      // 대상 카테고리의 프로젝트 이름만 체크
+      const existingProjectNames = allProjects
+        .filter(p => p.category === copyTargetCategory)
+        .map(p => p.name)
       
       const copiedProjects = []
       const skippedProjects = []
@@ -936,7 +972,7 @@ function App() {
           continue
         }
 
-        // 프로젝트 카피 (addProject가 자동으로 번호 할당)
+        // 프로젝트 복사 (addProject가 자동으로 번호 할당)
         await addProject({
           name: project.name,
           path: project.path,
@@ -952,13 +988,13 @@ function App() {
       // 결과 메시지 표시
       let resultMessage = ''
       if (copiedProjects.length > 0) {
-        resultMessage = `${copiedProjects.length}개 프로젝트가 카피되었습니다: ${copiedProjects.join(', ')}`
+        resultMessage = `${copiedProjects.length}개 프로젝트가 복사되었습니다: ${copiedProjects.join(', ')}`
       }
       if (skippedProjects.length > 0) {
         resultMessage += `\n\n이미 존재하는 프로젝트는 제외되었습니다 (${skippedProjects.length}개): ${skippedProjects.join(', ')}`
       }
 
-      setMessage(resultMessage || '카피할 프로젝트가 없습니다.')
+      setMessage(resultMessage || '복사할 프로젝트가 없습니다.')
       
       // 상태 초기화
       setCopyMode(false)
@@ -974,7 +1010,7 @@ function App() {
       }, 3000)
     } catch (error) {
       console.error('Error copying projects:', error)
-      setMessage('프로젝트 카피에 실패했습니다.')
+      setMessage('프로젝트 복사에 실패했습니다.')
     }
   }
 
@@ -1733,7 +1769,7 @@ function App() {
           }}>
             <div className="modal-content" onClick={(e) => e.stopPropagation()}>
               <div className="modal-header">
-                <h2>프로젝트 카피</h2>
+                <h2>프로젝트 복사</h2>
                 <button
                   className="close-btn"
                   onClick={() => {
@@ -1793,47 +1829,51 @@ function App() {
                         </select>
                         <FaChevronDown className="select-arrow" />
                       </div>
-                      {subcategories.length > 0 && (
-                        <div className="subcategories-section">
+                      <div className="subcategories-section">
+                        {subcategories.length > 0 && (
                           <div className="subcategories-list">
                             {subcategories.map((sub) => {
                               const isEditing = copyEditingSubcategory === sub
                               return (
                                 <div key={sub} className="subcategory-item">
                                   {isEditing ? (
-                                    <form
+                                    <div
                                       className="subcategory-edit-form"
-                                      onSubmit={async (e) => {
-                                        e.preventDefault()
-                                        if (!copyEditingSubcategoryName.trim()) return
-                                        try {
-                                          await updateSubcategory(copyTargetCategory, sub, copyEditingSubcategoryName.trim())
-                                          setMessage('서브카테고리가 수정되었습니다.')
-                                          const updatedCategories = await getCategories()
-                                          setCategories(updatedCategories)
-                                          setCopyEditingSubcategory(null)
-                                          setCopyEditingSubcategoryName('')
-                                          setTimeout(() => setMessage(''), 2000)
-                                        } catch (error) {
-                                          console.error('Error updating subcategory:', error)
-                                          setMessage('서브카테고리 수정에 실패했습니다.')
-                                        }
-                                      }}
                                     >
                                       <input
                                         type="text"
                                         value={copyEditingSubcategoryName}
                                         onChange={(e) => setCopyEditingSubcategoryName(e.target.value)}
+                                        onKeyDown={(e) => {
+                                          if (e.key === 'Enter') {
+                                            e.preventDefault()
+                                            e.stopPropagation()
+                                            if (!copyEditingSubcategoryName.trim()) return
+                                            handleCopyModalUpdateSubcategory(sub)
+                                          }
+                                        }}
                                         className="subcategory-edit-input"
                                         autoFocus
                                       />
-                                      <button type="submit" className="add-btn-small" title="저장">
+                                      <button 
+                                        type="button"
+                                        className="add-btn-small" 
+                                        title="저장"
+                                        onClick={async (e) => {
+                                          e.preventDefault()
+                                          e.stopPropagation()
+                                          if (!copyEditingSubcategoryName.trim()) return
+                                          await handleCopyModalUpdateSubcategory(sub)
+                                        }}
+                                      >
                                         <FaCheck />
                                       </button>
                                       <button
                                         type="button"
                                         className="delete-btn"
-                                        onClick={() => {
+                                        onClick={(e) => {
+                                          e.preventDefault()
+                                          e.stopPropagation()
                                           setCopyEditingSubcategory(null)
                                           setCopyEditingSubcategoryName('')
                                         }}
@@ -1841,7 +1881,7 @@ function App() {
                                       >
                                         <FaTimes />
                                       </button>
-                                    </form>
+                                    </div>
                                   ) : (
                                     <>
                                       <span className="subcategory-name">{sub}</span>
@@ -1889,39 +1929,40 @@ function App() {
                               )
                             })}
                           </div>
-                          <form
-                            className="subcategory-add-form"
-                            onSubmit={async (e) => {
-                              e.preventDefault()
-                              if (!copyNewSubcategoryName.trim()) return
-                              try {
-                                await addSubcategory(copyTargetCategory, copyNewSubcategoryName.trim())
-                                setMessage('서브카테고리가 추가되었습니다.')
-                                const updatedCategories = await getCategories()
-                                setCategories(updatedCategories)
-                                setCopyNewSubcategoryName('')
-                                setTimeout(() => setMessage(''), 2000)
-                              } catch (error) {
-                                console.error('Error adding subcategory:', error)
-                                setMessage('서브카테고리 추가에 실패했습니다.')
+                        )}
+                        <div
+                          className="subcategory-add-form"
+                        >
+                          <input
+                            type="text"
+                            value={copyNewSubcategoryName}
+                            onChange={(e) => setCopyNewSubcategoryName(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                handleCopyModalAddSubcategory()
                               }
                             }}
-                          >
-                            <input
-                              type="text"
-                              value={copyNewSubcategoryName}
-                              onChange={(e) => setCopyNewSubcategoryName(e.target.value)}
-                              placeholder="서브카테고리 추가..."
-                              className="subcategory-input"
-                            />
-                            {copyNewSubcategoryName.trim() && (
-                              <button type="submit" className="add-btn-small" title="추가">
-                                <FaPlus />
-                              </button>
-                            )}
-                          </form>
+                            placeholder="서브카테고리 추가..."
+                            className="subcategory-input"
+                          />
+                          {copyNewSubcategoryName.trim() && (
+                            <button 
+                              type="button"
+                              className="add-btn-small" 
+                              title="추가"
+                              onClick={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                handleCopyModalAddSubcategory()
+                              }}
+                            >
+                              <FaPlus />
+                            </button>
+                          )}
                         </div>
-                      )}
+                      </div>
                     </div>
                   )
                 })()}
@@ -1939,7 +1980,7 @@ function App() {
                   >
                     취소
                   </button>
-                  <button type="submit">카피 실행</button>
+                  <button type="submit">복사 실행</button>
                 </div>
               </form>
             </div>
@@ -2054,7 +2095,7 @@ function App() {
                 <button
                   className={`copy-mode-btn ${copyMode ? 'active' : ''}`}
                   onClick={toggleCopyMode}
-                  title={copyMode ? (selectedProjectsForCopy.length > 0 ? '카피 실행' : '카피 모드 종료') : '프로젝트 카피 모드'}
+                  title={copyMode ? (selectedProjectsForCopy.length > 0 ? '복사 실행' : '복사 모드 종료') : '프로젝트 복사 모드'}
                   style={{ color: copyMode ? '#4caf50' : selectedCategoryColor }}
                 >
                   <FaCopy />
@@ -2145,7 +2186,7 @@ function ProjectCard({
   
   const projectColor = getProjectColor()
   
-  // 정렬 모드 또는 카피 모드일 때는 클릭 이벤트 비활성화
+  // 정렬 모드 또는 복사 모드일 때는 클릭 이벤트 비활성화
   const handleCardClick = (e) => {
     if (sortMode || copyMode) {
       e.preventDefault()
