@@ -72,6 +72,8 @@ function App() {
   const [confirmMessage, setConfirmMessage] = useState('')
   const confirmCallbackRef = useRef(null)
   const isInitialLoad = useRef(true)
+  const dragTimerRef = useRef(null)
+  const lastDragTargetRef = useRef({ projectId: null, insertPosition: null })
 
   // 이메일 마스킹 함수
   const maskEmail = (email) => {
@@ -722,45 +724,88 @@ function App() {
 
   const handleDragStart = (e, projectId) => {
     if (!sortMode) return
+    // 타이머 클리어
+    if (dragTimerRef.current) {
+      clearTimeout(dragTimerRef.current)
+      dragTimerRef.current = null
+    }
     setDraggedProjectId(projectId)
     e.dataTransfer.effectAllowed = 'move'
     e.dataTransfer.setData('text/html', projectId)
+    lastDragTargetRef.current = { projectId: null, insertPosition: null }
   }
 
   const handleDragOver = (e, projectId) => {
-    if (!sortMode || !draggedProjectId) return
+    if (!sortMode || !draggedProjectId || projectId === draggedProjectId) return
     e.preventDefault()
     e.dataTransfer.dropEffect = 'move'
-    setDraggedOverProjectId(projectId)
+    
+    // 드래그 위치에 따라 삽입 위치 결정 (왼쪽/오른쪽)
+    const rect = e.currentTarget.getBoundingClientRect()
+    const x = e.clientX - rect.left
+    const width = rect.width
+    const insertPosition = x < width / 2 ? 'left' : 'right' // 왼쪽 절반이면 'left', 오른쪽 절반이면 'right'
+    
+    // 타겟이나 위치가 변경되었을 때만 처리
+    if (lastDragTargetRef.current.projectId !== projectId || 
+        lastDragTargetRef.current.insertPosition !== insertPosition) {
+      // 이전 타이머 클리어
+      if (dragTimerRef.current) {
+        clearTimeout(dragTimerRef.current)
+        dragTimerRef.current = null
+      }
+      
+      // 새로운 타겟 저장
+      lastDragTargetRef.current = { projectId, insertPosition }
+      setDraggedOverProjectId(projectId)
+      
+      // 0.5초 후 자동 업데이트
+      dragTimerRef.current = setTimeout(() => {
+        applyProjectReorder(projectId, insertPosition)
+        dragTimerRef.current = null
+      }, 500)
+    }
   }
 
-  const handleDragLeave = () => {
-    setDraggedOverProjectId(null)
-  }
-
-  const handleDrop = async (e, targetProjectId) => {
-    e.preventDefault()
-    if (!sortMode || !draggedProjectId || draggedProjectId === targetProjectId) {
-      setDraggedProjectId(null)
-      setDraggedOverProjectId(null)
+  // 프로젝트 순서 변경 함수
+  const applyProjectReorder = async (targetProjectId, insertPosition) => {
+    if (!draggedProjectId || !targetProjectId || draggedProjectId === targetProjectId) {
       return
     }
 
     try {
-      // 전체 프로젝트 목록 사용 (카테고리 필터와 무관)
-      const allProjects = [...projects].sort((a, b) => (a.number || 0) - (b.number || 0))
+      const allProjects = [...projects]
+        .map(p => ({ ...p }))
+        .sort((a, b) => (a.number || 0) - (b.number || 0))
       
-      // 드래그한 프로젝트와 타겟 프로젝트의 인덱스 찾기
       const draggedIndex = allProjects.findIndex(p => p.id === draggedProjectId)
       const targetIndex = allProjects.findIndex(p => p.id === targetProjectId)
       
       if (draggedIndex === -1 || targetIndex === -1) return
       
-      // 프로젝트 순서 변경
+      // 드래그한 프로젝트 제거
       const [draggedProject] = allProjects.splice(draggedIndex, 1)
-      allProjects.splice(targetIndex, 0, draggedProject)
       
-      // 새로운 번호 할당 (1부터 순차적으로)
+      // 삽입 위치 결정 (draggedProject 제거 후 인덱스 조정)
+      let insertIndex
+      if (insertPosition === 'right') {
+        if (draggedIndex < targetIndex) {
+          insertIndex = targetIndex - 1 
+        } else {
+          insertIndex = targetIndex
+        }
+      } else {
+        if (draggedIndex < targetIndex) {
+          insertIndex = targetIndex
+        } else {
+          insertIndex = targetIndex + 1
+        }
+      }
+      
+      // 프로젝트 삽입
+      allProjects.splice(insertIndex, 0, draggedProject)
+      
+      // 새로운 번호 할당
       const projectsToUpdate = allProjects.map((project, index) => ({
         ...project,
         newNumber: index + 1
@@ -772,26 +817,65 @@ function App() {
         .map(project => updateProject(project.id, { number: project.newNumber }))
       
       await Promise.all(updatePromises)
-      
-      // 상태 초기화 (정렬 모드는 유지)
-      setDraggedProjectId(null)
-      setDraggedOverProjectId(null)
-      
-      // 프로젝트 목록 새로고침
       loadProjects()
       setMessage('프로젝트 순서가 변경되었습니다.')
       setTimeout(() => setMessage(''), 2000)
     } catch (error) {
       console.error('Error reordering projects:', error)
       setMessage('프로젝트 순서 변경에 실패했습니다.')
-      setDraggedProjectId(null)
-      setDraggedOverProjectId(null)
     }
   }
 
-  const handleDragEnd = () => {
+  const handleDragLeave = () => {
+    // 타이머 클리어
+    if (dragTimerRef.current) {
+      clearTimeout(dragTimerRef.current)
+      dragTimerRef.current = null
+    }
+    setDraggedOverProjectId(null)
+    lastDragTargetRef.current = { projectId: null, insertPosition: null }
+  }
+
+  const handleDrop = async (e, targetProjectId) => {
+    e.preventDefault()
+    
+    // 타이머 클리어
+    if (dragTimerRef.current) {
+      clearTimeout(dragTimerRef.current)
+      dragTimerRef.current = null
+    }
+    
+    if (!sortMode || !draggedProjectId || draggedProjectId === targetProjectId) {
+      setDraggedProjectId(null)
+      setDraggedOverProjectId(null)
+      lastDragTargetRef.current = { projectId: null, insertPosition: null }
+      return
+    }
+
+    // 드롭 위치에 따라 삽입 위치 결정
+    const rect = e.currentTarget.getBoundingClientRect()
+    const x = e.clientX - rect.left
+    const width = rect.width
+    const insertPosition = x < width / 2 ? 'left' : 'right'
+    
+    // 즉시 적용
+    await applyProjectReorder(targetProjectId, insertPosition)
+    
+    // 상태 초기화
     setDraggedProjectId(null)
     setDraggedOverProjectId(null)
+    lastDragTargetRef.current = { projectId: null, insertPosition: null }
+  }
+
+  const handleDragEnd = () => {
+    // 타이머 클리어
+    if (dragTimerRef.current) {
+      clearTimeout(dragTimerRef.current)
+      dragTimerRef.current = null
+    }
+    setDraggedProjectId(null)
+    setDraggedOverProjectId(null)
+    lastDragTargetRef.current = { projectId: null, insertPosition: null }
   }
 
   const toggleSortMode = () => {

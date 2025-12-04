@@ -363,6 +363,7 @@ linear infinite;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
   transition: all 0.3s ease;
   cursor: pointer;
+  user-select: none;
 }
 
 .project-card.not-allowed .project-content {
@@ -382,6 +383,10 @@ linear infinite;
 .project-card:hover {
   transform: translateY(-4px);
   box-shadow: 0 8px 12px rgba(0, 0, 0, 0.15);
+}
+
+.project-card:active {
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1), inset 0 5px 10px 3px rgba(0, 0, 0, .2);
 }
 
 .project-card.draggable {
@@ -472,6 +477,9 @@ linear infinite;
 }
 
 .project-actions {
+  position: absolute;
+  top: 1rem;
+  right: 1.25rem;
   display: flex;
   gap: 0.5rem;
   align-items: center;
@@ -631,7 +639,6 @@ linear infinite;
 
 .confirm-btn:hover {
   background: #d32f2f;
-  transform: scale(1.05);
 }
 
 .cancel-btn {
@@ -648,7 +655,6 @@ linear infinite;
 
 .cancel-btn:hover {
   background: #bdbdbd;
-  transform: scale(1.05);
 }
 
 .close-btn {
