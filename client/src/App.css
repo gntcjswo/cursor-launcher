@@ -319,7 +319,7 @@ linear infinite;
   align-items: center;
 }
 
-.sort-mode-btn, .copy-mode-btn {
+.sort-mode-btn, .copy-mode-btn, .delete-mode-btn {
   background: white;
   border: none;
   padding: 0.5rem 1rem;
@@ -333,7 +333,7 @@ linear infinite;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-.sort-mode-btn:hover, .copy-mode-btn:hover {
+.sort-mode-btn:hover, .copy-mode-btn:hover, .delete-mode-btn:hover {
   transform: scale(1.05);
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
 }
@@ -346,6 +346,11 @@ linear infinite;
 .copy-mode-btn.active {
   background: #e8f5e9;
   color: #4caf50;
+}
+
+.delete-mode-btn.active {
+  background: #ffebee;
+  color: #f44336;
 }
 
 .project-grid {

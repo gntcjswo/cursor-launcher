@@ -62,6 +62,8 @@ function App() {
   const [draggedOverProjectId, setDraggedOverProjectId] = useState(null)
   const [copyMode, setCopyMode] = useState(false)
   const [selectedProjectsForCopy, setSelectedProjectsForCopy] = useState([])
+  const [deleteMode, setDeleteMode] = useState(false)
+  const [selectedProjectsForDelete, setSelectedProjectsForDelete] = useState([])
   const [showCopyModal, setShowCopyModal] = useState(false)
   const [copyTargetCategory, setCopyTargetCategory] = useState('')
   const [copyTargetSubcategory, setCopyTargetSubcategory] = useState('')
@@ -884,6 +886,12 @@ function App() {
       // 정렬 모드 종료 시 상태 초기화
       setDraggedProjectId(null)
       setDraggedOverProjectId(null)
+    } else {
+      // 정렬 모드 활성화 시 다른 모드 비활성화
+      setCopyMode(false)
+      setSelectedProjectsForCopy([])
+      setDeleteMode(false)
+      setSelectedProjectsForDelete([])
     }
   }
 
@@ -897,18 +905,88 @@ function App() {
       if (copyMode) {
         // 복사 모드 종료 시 선택 초기화
         setSelectedProjectsForCopy([])
+      } else {
+        // 복사 모드 활성화 시 삭제 모드 비활성화
+        setDeleteMode(false)
+        setSelectedProjectsForDelete([])
       }
     }
   }
 
-  const handleProjectCheck = (projectId) => {
-    setSelectedProjectsForCopy(prev => {
-      if (prev.includes(projectId)) {
-        return prev.filter(id => id !== projectId)
+  const toggleDeleteMode = () => {
+    if (deleteMode && selectedProjectsForDelete.length > 0) {
+      // 삭제 모드 종료 시 선택된 프로젝트가 있으면 확인 팝업 표시
+      const projectNames = projects
+        .filter(p => selectedProjectsForDelete.includes(p.id))
+        .map(p => p.name)
+        .join(', ')
+      
+      showConfirm(
+        `선택한 ${selectedProjectsForDelete.length}개 프로젝트를 삭제하시겠습니까?\n\n${projectNames}`,
+        async () => {
+          await handleDeleteSelectedProjects()
+        }
+      )
+    } else {
+      // 삭제 모드 토글
+      setDeleteMode(!deleteMode)
+      if (deleteMode) {
+        // 삭제 모드 종료 시 선택 초기화
+        setSelectedProjectsForDelete([])
       } else {
-        return [...prev, projectId]
+        // 삭제 모드 활성화 시 복사 모드 비활성화
+        setCopyMode(false)
+        setSelectedProjectsForCopy([])
       }
-    })
+    }
+  }
+
+  const handleDeleteSelectedProjects = async () => {
+    if (!isAllowed) {
+      setMessage('권한이 없습니다. 허용된 계정으로 로그인해주세요.')
+      return
+    }
+
+    try {
+      const projectsToDelete = projects.filter(p => selectedProjectsForDelete.includes(p.id))
+      const deletePromises = projectsToDelete.map(project => deleteProject(project.id))
+      await Promise.all(deletePromises)
+      
+      setMessage(`${selectedProjectsForDelete.length}개 프로젝트가 삭제되었습니다.`)
+      
+      // 상태 초기화
+      setDeleteMode(false)
+      setSelectedProjectsForDelete([])
+      
+      // 프로젝트 목록 새로고침
+      setTimeout(() => {
+        setMessage('')
+        loadProjects()
+      }, 1000)
+    } catch (error) {
+      console.error('Error deleting projects:', error)
+      setMessage('프로젝트 삭제에 실패했습니다.')
+    }
+  }
+
+  const handleProjectCheck = (projectId) => {
+    if (copyMode) {
+      setSelectedProjectsForCopy(prev => {
+        if (prev.includes(projectId)) {
+          return prev.filter(id => id !== projectId)
+        } else {
+          return [...prev, projectId]
+        }
+      })
+    } else if (deleteMode) {
+      setSelectedProjectsForDelete(prev => {
+        if (prev.includes(projectId)) {
+          return prev.filter(id => id !== projectId)
+        } else {
+          return [...prev, projectId]
+        }
+      })
+    }
   }
 
   // 복사 모달에서 서브카테고리 수정 핸들러
@@ -2101,6 +2179,14 @@ function App() {
                   <FaCopy />
                 </button>
                 <button
+                  className={`delete-mode-btn ${deleteMode ? 'active' : ''}`}
+                  onClick={toggleDeleteMode}
+                  title={deleteMode ? (selectedProjectsForDelete.length > 0 ? '삭제 실행' : '삭제 모드 종료') : '프로젝트 삭제 모드'}
+                  style={{ color: deleteMode ? '#f44336' : selectedCategoryColor }}
+                >
+                  <FaTrash />
+                </button>
+                <button
                   className={`sort-mode-btn ${sortMode ? 'active' : ''}`}
                   onClick={toggleSortMode}
                   title={sortMode ? '정렬 모드 종료' : '순서 변경 모드'}
@@ -2134,7 +2220,9 @@ function App() {
                   onDrop={handleDrop}
                   onDragEnd={handleDragEnd}
                   copyMode={copyMode}
-                  isChecked={selectedProjectsForCopy.includes(project.id)}
+                  isChecked={copyMode ? selectedProjectsForCopy.includes(project.id) : false}
+                  deleteMode={deleteMode}
+                  isCheckedForDelete={deleteMode ? selectedProjectsForDelete.includes(project.id) : false}
                   onCheck={handleProjectCheck}
                 />
               ))}
@@ -2166,6 +2254,8 @@ function ProjectCard({
   onDragEnd,
   copyMode,
   isChecked,
+  deleteMode,
+  isCheckedForDelete,
   onCheck
 }) {
   // 프로젝트 색상 또는 카테고리 색상 가져오기
@@ -2186,9 +2276,9 @@ function ProjectCard({
   
   const projectColor = getProjectColor()
   
-  // 정렬 모드 또는 복사 모드일 때는 클릭 이벤트 비활성화
+  // 정렬 모드, 복사 모드, 삭제 모드일 때는 클릭 이벤트 비활성화
   const handleCardClick = (e) => {
-    if (sortMode || copyMode) {
+    if (sortMode || copyMode || deleteMode) {
       e.preventDefault()
       e.stopPropagation()
       return
@@ -2198,7 +2288,7 @@ function ProjectCard({
   
   return (
     <div 
-      className={`project-card ${!isAllowed ? 'not-allowed' : ''} ${sortMode ? 'draggable' : ''} ${isDragged ? 'dragging' : ''} ${isDraggedOver ? 'drag-over' : ''} ${copyMode && isChecked ? 'checked' : ''}`}
+      className={`project-card ${!isAllowed ? 'not-allowed' : ''} ${sortMode ? 'draggable' : ''} ${isDragged ? 'dragging' : ''} ${isDraggedOver ? 'drag-over' : ''} ${copyMode && isChecked ? 'checked' : ''} ${deleteMode && isCheckedForDelete ? 'checked' : ''}`}
       draggable={sortMode && isAllowed}
       onDragStart={(e) => onDragStart?.(e, project.id)}
       onDragOver={(e) => onDragOver?.(e, project.id)}
@@ -2213,7 +2303,7 @@ function ProjectCard({
         >
           #{project.index}
         </span>
-        {isAllowed && !sortMode && !copyMode && (
+        {isAllowed && !sortMode && !copyMode && !deleteMode && (
           <div className="project-actions">
             <button
               className={`favorite-btn ${project.isFavorite ? 'active' : ''}`}
@@ -2285,6 +2375,18 @@ function ProjectCard({
           <input
             type="checkbox"
             checked={isChecked || false}
+            onChange={() => onCheck?.(project.id)}
+          />
+          <span>
+            <FaCheck className="checkbox-icon" />
+          </span>
+        </label>
+      )}
+      {deleteMode && isAllowed && (
+        <label className="project-checkbox checkbox-label" onClick={(e) => e.stopPropagation()}>
+          <input
+            type="checkbox"
+            checked={isCheckedForDelete || false}
             onChange={() => onCheck?.(project.id)}
           />
           <span>

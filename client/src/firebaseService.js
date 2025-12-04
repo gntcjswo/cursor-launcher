@@ -56,7 +56,7 @@ export const getProjects = async () => {
 				number: data.number || 0
 			}
 		})
-		
+
 		// number 기준으로 정렬 (number가 0이거나 없는 경우는 마지막으로)
 		projects.sort((a, b) => {
 			const aNum = a.number || 0
@@ -66,11 +66,11 @@ export const getProjects = async () => {
 			if (bNum === 0) return -1
 			return aNum - bNum
 		})
-		
+
 		// number가 0이거나 없는 프로젝트들에 대해 순차적으로 번호 할당 (마이그레이션)
 		const numbers = projects.map(p => p.number || 0).filter(n => n > 0)
 		let currentNumber = numbers.length > 0 ? Math.max(...numbers) : 0
-		
+
 		const updatePromises = []
 		projects.forEach(project => {
 			if (!project.number || project.number === 0) {
@@ -83,12 +83,12 @@ export const getProjects = async () => {
 				)
 			}
 		})
-		
+
 		// 모든 업데이트가 완료될 때까지 기다리지 않음 (비동기로 처리)
 		if (updatePromises.length > 0) {
 			Promise.all(updatePromises).catch(err => console.error('Error in batch update:', err))
 		}
-		
+
 		// index는 number와 동일하게 설정
 		return projects.map(project => ({
 			...project,
@@ -102,20 +102,23 @@ export const getProjects = async () => {
 
 export const addProject = async (project) => {
 	try {
-		// 현재 모든 프로젝트를 가져와서 최대 번호 찾기
+		// 현재 모든 프로젝트를 가져와서 해당 카테고리의 최대 번호 찾기
 		const projectsSnapshot = await getDocs(collection(db, PROJECTS_COLLECTION))
 		const projects = projectsSnapshot.docs.map(doc => ({
 			...doc.data(),
 			number: doc.data().number || 0
 		}))
-		
-		// 최대 번호 계산
-		const numbers = projects.map(p => p.number || 0).filter(n => n > 0)
+
+		// 해당 카테고리의 프로젝트만 필터링
+		const categoryProjects = projects.filter(p => p.category === project.category)
+
+		// 해당 카테고리의 최대 번호 계산
+		const numbers = categoryProjects.map(p => p.number || 0).filter(n => n > 0)
 		const maxNumber = numbers.length > 0 ? Math.max(...numbers) : 0
-		
-		// 새 프로젝트 번호 = 최대 번호 + 1
+
+		// 새 프로젝트 번호 = 해당 카테고리의 최대 번호 + 1
 		const newNumber = maxNumber + 1
-		
+
 		const projectData = {
 			...project,
 			number: newNumber,
@@ -123,7 +126,7 @@ export const addProject = async (project) => {
 			isRecent: false,
 			lastOpenedAt: null
 		}
-		
+
 		const docRef = await addDoc(collection(db, PROJECTS_COLLECTION), projectData)
 		return { id: docRef.id, ...projectData, index: newNumber }
 	} catch (error) {
@@ -232,25 +235,25 @@ export const addSubcategory = async (categoryName, subcategoryName) => {
 		const categoriesSnapshot = await getDocs(
 			query(collection(db, CATEGORIES_COLLECTION), where('name', '==', categoryName))
 		)
-		
+
 		if (categoriesSnapshot.empty) {
 			throw new Error('Category not found')
 		}
-		
+
 		const updatePromises = categoriesSnapshot.docs.map(async (doc) => {
 			const data = doc.data()
 			const subcategories = data.subcategories || []
-			
+
 			// 중복 확인
 			if (subcategories.includes(subcategoryName)) {
 				throw new Error('Subcategory already exists')
 			}
-			
+
 			await updateDoc(doc.ref, {
 				subcategories: [...subcategories, subcategoryName]
 			})
 		})
-		
+
 		await Promise.all(updatePromises)
 	} catch (error) {
 		console.error('Error adding subcategory:', error)
@@ -263,25 +266,25 @@ export const updateSubcategory = async (categoryName, oldSubcategoryName, newSub
 		const categoriesSnapshot = await getDocs(
 			query(collection(db, CATEGORIES_COLLECTION), where('name', '==', categoryName))
 		)
-		
+
 		const updatePromises = categoriesSnapshot.docs.map(async (doc) => {
 			const data = doc.data()
-			const subcategories = (data.subcategories || []).map(sub => 
+			const subcategories = (data.subcategories || []).map(sub =>
 				sub === oldSubcategoryName ? newSubcategoryName : sub
 			)
-			
+
 			await updateDoc(doc.ref, {
 				subcategories: subcategories
 			})
 		})
-		
+
 		await Promise.all(updatePromises)
-		
+
 		// 해당 서브카테고리를 사용하는 프로젝트들의 subcategory 필드도 업데이트
 		const projectsSnapshot = await getDocs(
 			query(collection(db, PROJECTS_COLLECTION), where('category', '==', categoryName))
 		)
-		
+
 		const projectUpdatePromises = projectsSnapshot.docs.map(async (doc) => {
 			const projectData = doc.data()
 			if (projectData.subcategory === oldSubcategoryName) {
@@ -290,7 +293,7 @@ export const updateSubcategory = async (categoryName, oldSubcategoryName, newSub
 				})
 			}
 		})
-		
+
 		await Promise.all(projectUpdatePromises)
 	} catch (error) {
 		console.error('Error updating subcategory:', error)
@@ -303,23 +306,23 @@ export const deleteSubcategory = async (categoryName, subcategoryName) => {
 		const categoriesSnapshot = await getDocs(
 			query(collection(db, CATEGORIES_COLLECTION), where('name', '==', categoryName))
 		)
-		
+
 		const updatePromises = categoriesSnapshot.docs.map(async (doc) => {
 			const data = doc.data()
 			const subcategories = (data.subcategories || []).filter(sub => sub !== subcategoryName)
-			
+
 			await updateDoc(doc.ref, {
 				subcategories: subcategories
 			})
 		})
-		
+
 		await Promise.all(updatePromises)
-		
+
 		// 해당 서브카테고리를 사용하는 프로젝트들의 subcategory 필드를 제거
 		const projectsSnapshot = await getDocs(
 			query(collection(db, PROJECTS_COLLECTION), where('category', '==', categoryName))
 		)
-		
+
 		const projectUpdatePromises = projectsSnapshot.docs.map(async (doc) => {
 			const projectData = doc.data()
 			if (projectData.subcategory === subcategoryName) {
@@ -328,7 +331,7 @@ export const deleteSubcategory = async (categoryName, subcategoryName) => {
 				})
 			}
 		})
-		
+
 		await Promise.all(projectUpdatePromises)
 	} catch (error) {
 		console.error('Error deleting subcategory:', error)
@@ -399,12 +402,12 @@ export const getRecent = async () => {
 				docs: sortedDocs
 			}
 		}
-		
+
 		// 프로젝트 이름 추출 및 중복 제거
 		const recentNames = recentSnapshot.docs
 			.map(doc => doc.data().name)
 			.filter(Boolean)
-		
+
 		// 중복 제거 (같은 이름이 여러 번 나타날 수 있으므로)
 		const uniqueRecent = []
 		const seen = new Set()
@@ -414,7 +417,7 @@ export const getRecent = async () => {
 				uniqueRecent.push(name)
 			}
 		}
-		
+
 		return uniqueRecent.slice(0, 8)
 	} catch (error) {
 		console.error('Error in getRecent:', error)
