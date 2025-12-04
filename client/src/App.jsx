@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { FaStar, FaRegStar, FaPlus, FaTimes, FaEdit, FaTrash, FaFolder, FaSignInAlt, FaSignOutAlt, FaUserShield, FaCheck, FaChevronDown, FaArrowsAlt, FaGripVertical } from 'react-icons/fa'
+import { FaStar, FaRegStar, FaPlus, FaTimes, FaEdit, FaTrash, FaFolder, FaSignInAlt, FaSignOutAlt, FaUserShield, FaCheck, FaChevronDown, FaArrowsAlt, FaGripVertical, FaCopy } from 'react-icons/fa'
 import { signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth'
 import { auth, googleProvider } from './firebase'
 import {
@@ -60,6 +60,17 @@ function App() {
   const [sortMode, setSortMode] = useState(false)
   const [draggedProjectId, setDraggedProjectId] = useState(null)
   const [draggedOverProjectId, setDraggedOverProjectId] = useState(null)
+  const [copyMode, setCopyMode] = useState(false)
+  const [selectedProjectsForCopy, setSelectedProjectsForCopy] = useState([])
+  const [showCopyModal, setShowCopyModal] = useState(false)
+  const [copyTargetCategory, setCopyTargetCategory] = useState('')
+  const [copyTargetSubcategory, setCopyTargetSubcategory] = useState('')
+  const [copyNewSubcategoryName, setCopyNewSubcategoryName] = useState('')
+  const [copyEditingSubcategory, setCopyEditingSubcategory] = useState(null)
+  const [copyEditingSubcategoryName, setCopyEditingSubcategoryName] = useState('')
+  const [showConfirmModal, setShowConfirmModal] = useState(false)
+  const [confirmMessage, setConfirmMessage] = useState('')
+  const confirmCallbackRef = useRef(null)
   const isInitialLoad = useRef(true)
 
   // 이메일 마스킹 함수
@@ -296,24 +307,39 @@ function App() {
     }
   }
 
-  const handleRemoveRecent = async (project) => {
+  // 확인 모달을 표시하는 헬퍼 함수
+  const showConfirm = (message, callback) => {
+    // 콜백이 있으면 ref에 저장 (실행하지 않음)
+    setConfirmMessage(message)
+    confirmCallbackRef.current = callback || null
+    setShowConfirmModal(true)
+  }
+
+  const handleRemoveRecent = (project) => {
     if (!isAllowed) {
       setMessage('권한이 없습니다. 허용된 계정으로 로그인해주세요.')
       return
     }
 
-    try {
-      await removeRecent(project.name)
-      setMessage('최근 목록에서 제거되었습니다.')
-      // 프로젝트 목록 새로고침
-      setTimeout(() => {
-        setMessage('')
-        loadProjects()
-      }, 1000)
-    } catch (error) {
-      console.error('Error removing recent:', error)
-      setMessage('최근 목록 제거에 실패했습니다.')
-    }
+    // 모달만 표시하고, 실제 제거는 확인 버튼 클릭 시에만 실행
+    const projectName = project.name
+    
+    showConfirm(
+      `"${projectName}" 프로젝트를 최근 실행한 목록에서 제거하시겠습니까?`,
+      async () => {
+        try {
+          await removeRecent(projectName)
+          setMessage('최근 목록에서 제거되었습니다.')
+          setTimeout(() => {
+            setMessage('')
+            loadProjects()
+          }, 1000)
+        } catch (error) {
+          console.error('Error removing recent:', error)
+          setMessage('최근 목록 제거에 실패했습니다.')
+        }
+      }
+    )
   }
 
   const handleLogin = async () => {
@@ -509,28 +535,29 @@ function App() {
     }
   }
 
-  const handleDeleteProject = async (project) => {
+  const handleDeleteProject = (project) => {
     if (!isAllowed) {
       setMessage('권한이 없습니다. 허용된 계정으로 로그인해주세요.')
       return
     }
 
-    if (!confirm(`"${project.name}" 프로젝트를 삭제하시겠습니까?`)) {
-      return
-    }
-
-    try {
-      // 프로젝트 삭제 (isFavorite, isRecent 정보도 함께 삭제됨)
-      await deleteProject(project.id)
-      setMessage('프로젝트가 삭제되었습니다.')
-      setTimeout(() => {
-        setMessage('')
-        loadProjects()
-      }, 1000)
-    } catch (error) {
-      console.error('Error deleting project:', error)
-      setMessage('프로젝트 삭제에 실패했습니다.')
-    }
+    showConfirm(
+      `"${project.name}" 프로젝트를 삭제하시겠습니까?`,
+      async () => {
+        try {
+          // 프로젝트 삭제 (isFavorite, isRecent 정보도 함께 삭제됨)
+          await deleteProject(project.id)
+          setMessage('프로젝트가 삭제되었습니다.')
+          setTimeout(() => {
+            setMessage('')
+            loadProjects()
+          }, 1000)
+        } catch (error) {
+          console.error('Error deleting project:', error)
+          setMessage('프로젝트 삭제에 실패했습니다.')
+        }
+      }
+    )
   }
 
   const handleAddCategory = async (e) => {
@@ -672,23 +699,25 @@ function App() {
     setEditingSubcategoryName('')
   }
 
-  const handleDeleteSubcategory = async (categoryName, subcategoryName) => {
+  const handleDeleteSubcategory = (categoryName, subcategoryName) => {
     if (!isAllowed) {
       setMessage('권한이 없습니다. 허용된 계정으로 로그인해주세요.')
       return
     }
-    if (!confirm(`"${subcategoryName}" 서브카테고리를 삭제하시겠습니까?`)) {
-      return
-    }
-    try {
-      await deleteSubcategory(categoryName, subcategoryName)
-      setMessage('서브카테고리가 삭제되었습니다.')
-      loadProjects()
-      setTimeout(() => setMessage(''), 2000)
-    } catch (error) {
-      console.error('Error deleting subcategory:', error)
-      setMessage('서브카테고리 삭제에 실패했습니다.')
-    }
+    showConfirm(
+      `"${subcategoryName}" 서브카테고리를 삭제하시겠습니까?`,
+      async () => {
+        try {
+          await deleteSubcategory(categoryName, subcategoryName)
+          setMessage('서브카테고리가 삭제되었습니다.')
+          loadProjects()
+          setTimeout(() => setMessage(''), 2000)
+        } catch (error) {
+          console.error('Error deleting subcategory:', error)
+          setMessage('서브카테고리 삭제에 실패했습니다.')
+        }
+      }
+    )
   }
 
   const handleDragStart = (e, projectId) => {
@@ -774,43 +803,135 @@ function App() {
     }
   }
 
-  const handleDeleteCategory = async (categoryName) => {
+  const toggleCopyMode = () => {
+    if (copyMode && selectedProjectsForCopy.length > 0) {
+      // 카피 모드 종료 시 선택된 프로젝트가 있으면 카피 모달 표시
+      setShowCopyModal(true)
+    } else {
+      // 카피 모드 토글
+      setCopyMode(!copyMode)
+      if (copyMode) {
+        // 카피 모드 종료 시 선택 초기화
+        setSelectedProjectsForCopy([])
+      }
+    }
+  }
+
+  const handleProjectCheck = (projectId) => {
+    setSelectedProjectsForCopy(prev => {
+      if (prev.includes(projectId)) {
+        return prev.filter(id => id !== projectId)
+      } else {
+        return [...prev, projectId]
+      }
+    })
+  }
+
+  const handleCopyProjects = async () => {
+    if (!copyTargetCategory) {
+      setMessage('대상 카테고리를 선택해주세요.')
+      return
+    }
+
     if (!isAllowed) {
       setMessage('권한이 없습니다. 허용된 계정으로 로그인해주세요.')
       return
     }
 
-    if (!confirm(`"${categoryName}" 카테고리를 삭제하시겠습니까?`)) {
-      return
-    }
-
     try {
-      // 해당 카테고리의 프로젝트 확인
       const allProjects = await getProjects()
-      const projectsInCategory = allProjects.filter(p => p.category === categoryName)
+      const projectsToCopy = projects.filter(p => selectedProjectsForCopy.includes(p.id))
+      const existingProjectNames = allProjects.map(p => p.name)
+      
+      const copiedProjects = []
+      const skippedProjects = []
 
-      if (projectsInCategory.length > 0) {
-        setMessage(`프로젝트가 있는 카테고리는 삭제할 수 없습니다. (${projectsInCategory.length}개 프로젝트)`)
-        return
+      for (const project of projectsToCopy) {
+        if (existingProjectNames.includes(project.name)) {
+          skippedProjects.push(project.name)
+          continue
+        }
+
+        // 프로젝트 카피 (addProject가 자동으로 번호 할당)
+        await addProject({
+          name: project.name,
+          path: project.path,
+          category: copyTargetCategory,
+          subcategory: copyTargetSubcategory || null,
+          color: project.color || null
+        })
+
+        copiedProjects.push(project.name)
+        existingProjectNames.push(project.name) // 중복 체크를 위해 추가
       }
 
-      await deleteCategory(categoryName)
-      const updatedCategories = await getCategories()
-      setCategories(updatedCategories)
-      
-      if (selectedCategory === categoryName) {
-        setSelectedCategory(updatedCategories[0] || null)
+      // 결과 메시지 표시
+      let resultMessage = ''
+      if (copiedProjects.length > 0) {
+        resultMessage = `${copiedProjects.length}개 프로젝트가 카피되었습니다: ${copiedProjects.join(', ')}`
       }
+      if (skippedProjects.length > 0) {
+        resultMessage += `\n\n이미 존재하는 프로젝트는 제외되었습니다 (${skippedProjects.length}개): ${skippedProjects.join(', ')}`
+      }
+
+      setMessage(resultMessage || '카피할 프로젝트가 없습니다.')
       
-      setMessage('카테고리가 삭제되었습니다.')
+      // 상태 초기화
+      setCopyMode(false)
+      setSelectedProjectsForCopy([])
+      setShowCopyModal(false)
+      setCopyTargetCategory('')
+      setCopyTargetSubcategory('')
+      
+      // 프로젝트 목록 새로고침
       setTimeout(() => {
         setMessage('')
         loadProjects()
-      }, 1000)
+      }, 3000)
     } catch (error) {
-      console.error('Error deleting category:', error)
-      setMessage('카테고리 삭제에 실패했습니다.')
+      console.error('Error copying projects:', error)
+      setMessage('프로젝트 카피에 실패했습니다.')
     }
+  }
+
+  const handleDeleteCategory = (categoryName) => {
+    if (!isAllowed) {
+      setMessage('권한이 없습니다. 허용된 계정으로 로그인해주세요.')
+      return
+    }
+
+    showConfirm(
+      `"${categoryName}" 카테고리를 삭제하시겠습니까?`,
+      async () => {
+        try {
+          // 해당 카테고리의 프로젝트 확인
+          const allProjects = await getProjects()
+          const projectsInCategory = allProjects.filter(p => p.category === categoryName)
+
+          if (projectsInCategory.length > 0) {
+            setMessage(`프로젝트가 있는 카테고리는 삭제할 수 없습니다. (${projectsInCategory.length}개 프로젝트)`)
+            return
+          }
+
+          await deleteCategory(categoryName)
+          const updatedCategories = await getCategories()
+          setCategories(updatedCategories)
+          
+          if (selectedCategory === categoryName) {
+            setSelectedCategory(updatedCategories[0] || null)
+          }
+        
+          setMessage('카테고리가 삭제되었습니다.')
+          setTimeout(() => {
+            setMessage('')
+            loadProjects()
+          }, 1000)
+        } catch (error) {
+          console.error('Error deleting category:', error)
+          setMessage('카테고리 삭제에 실패했습니다.')
+        }
+      }
+    )
   }
 
   const filteredProjects = (selectedCategory
@@ -1517,6 +1638,288 @@ function App() {
           </div>
         )}
 
+        {showCopyModal && (
+          <div className="modal-overlay" onClick={() => {
+            setShowCopyModal(false)
+            setCopyTargetCategory('')
+            setCopyTargetSubcategory('')
+            setCopyNewSubcategoryName('')
+            setCopyEditingSubcategory(null)
+            setCopyEditingSubcategoryName('')
+          }}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-header">
+                <h2>프로젝트 카피</h2>
+                <button
+                  className="close-btn"
+                  onClick={() => {
+                    setShowCopyModal(false)
+                    setCopyTargetCategory('')
+                    setCopyTargetSubcategory('')
+                    setCopyNewSubcategoryName('')
+                    setCopyEditingSubcategory(null)
+                    setCopyEditingSubcategoryName('')
+                  }}
+                >
+                  <FaTimes />
+                </button>
+              </div>
+              <form onSubmit={(e) => {
+                e.preventDefault()
+                handleCopyProjects()
+              }}>
+                <div className="form-group">
+                  <label>대상 카테고리 *</label>
+                  <div className="select-wrapper">
+                    <select
+                      value={copyTargetCategory}
+                      onChange={(e) => {
+                        setCopyTargetCategory(e.target.value)
+                        setCopyTargetSubcategory('')
+                      }}
+                      required
+                    >
+                      <option value="">선택하세요</option>
+                      {categories.map(cat => {
+                        const catName = typeof cat === 'string' ? cat : cat.name
+                        return <option key={catName} value={catName}>{catName}</option>
+                      })}
+                    </select>
+                    <FaChevronDown className="select-arrow" />
+                  </div>
+                </div>
+                {copyTargetCategory && (() => {
+                  const selectedCat = categories.find(c => {
+                    const catName = typeof c === 'string' ? c : c.name
+                    return catName === copyTargetCategory
+                  })
+                  const subcategories = selectedCat && typeof selectedCat !== 'string' ? (selectedCat.subcategories || []) : []
+                  return (
+                    <div className="form-group">
+                      <label>서브카테고리 (선택사항)</label>
+                      <div className="select-wrapper">
+                        <select
+                          value={copyTargetSubcategory}
+                          onChange={(e) => setCopyTargetSubcategory(e.target.value)}
+                        >
+                          <option value="">없음</option>
+                          {subcategories.map(sub => (
+                            <option key={sub} value={sub}>{sub}</option>
+                          ))}
+                        </select>
+                        <FaChevronDown className="select-arrow" />
+                      </div>
+                      {subcategories.length > 0 && (
+                        <div className="subcategories-section">
+                          <div className="subcategories-list">
+                            {subcategories.map((sub) => {
+                              const isEditing = copyEditingSubcategory === sub
+                              return (
+                                <div key={sub} className="subcategory-item">
+                                  {isEditing ? (
+                                    <form
+                                      className="subcategory-edit-form"
+                                      onSubmit={async (e) => {
+                                        e.preventDefault()
+                                        if (!copyEditingSubcategoryName.trim()) return
+                                        try {
+                                          await updateSubcategory(copyTargetCategory, sub, copyEditingSubcategoryName.trim())
+                                          setMessage('서브카테고리가 수정되었습니다.')
+                                          const updatedCategories = await getCategories()
+                                          setCategories(updatedCategories)
+                                          setCopyEditingSubcategory(null)
+                                          setCopyEditingSubcategoryName('')
+                                          setTimeout(() => setMessage(''), 2000)
+                                        } catch (error) {
+                                          console.error('Error updating subcategory:', error)
+                                          setMessage('서브카테고리 수정에 실패했습니다.')
+                                        }
+                                      }}
+                                    >
+                                      <input
+                                        type="text"
+                                        value={copyEditingSubcategoryName}
+                                        onChange={(e) => setCopyEditingSubcategoryName(e.target.value)}
+                                        className="subcategory-edit-input"
+                                        autoFocus
+                                      />
+                                      <button type="submit" className="add-btn-small" title="저장">
+                                        <FaCheck />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="delete-btn"
+                                        onClick={() => {
+                                          setCopyEditingSubcategory(null)
+                                          setCopyEditingSubcategoryName('')
+                                        }}
+                                        title="취소"
+                                      >
+                                        <FaTimes />
+                                      </button>
+                                    </form>
+                                  ) : (
+                                    <>
+                                      <span className="subcategory-name">{sub}</span>
+                                      <div className="subcategory-actions">
+                                        <button
+                                          className="edit-btn"
+                                          onClick={() => {
+                                            setCopyEditingSubcategory(sub)
+                                            setCopyEditingSubcategoryName(sub)
+                                          }}
+                                          title="수정"
+                                        >
+                                          <FaEdit />
+                                        </button>
+                                         <button
+                                           className="delete-btn"
+                                           onClick={() => {
+                                             showConfirm(
+                                               `"${sub}" 서브카테고리를 삭제하시겠습니까?`,
+                                               async () => {
+                                                 try {
+                                                   await deleteSubcategory(copyTargetCategory, sub)
+                                                   setMessage('서브카테고리가 삭제되었습니다.')
+                                                   const updatedCategories = await getCategories()
+                                                   setCategories(updatedCategories)
+                                                   if (copyTargetSubcategory === sub) {
+                                                     setCopyTargetSubcategory('')
+                                                   }
+                                                   setTimeout(() => setMessage(''), 2000)
+                                                 } catch (error) {
+                                                   console.error('Error deleting subcategory:', error)
+                                                   setMessage('서브카테고리 삭제에 실패했습니다.')
+                                                 }
+                                               }
+                                             )
+                                           }}
+                                           title="서브카테고리 삭제"
+                                         >
+                                           <FaTimes />
+                                         </button>
+                                      </div>
+                                    </>
+                                  )}
+                                </div>
+                              )
+                            })}
+                          </div>
+                          <form
+                            className="subcategory-add-form"
+                            onSubmit={async (e) => {
+                              e.preventDefault()
+                              if (!copyNewSubcategoryName.trim()) return
+                              try {
+                                await addSubcategory(copyTargetCategory, copyNewSubcategoryName.trim())
+                                setMessage('서브카테고리가 추가되었습니다.')
+                                const updatedCategories = await getCategories()
+                                setCategories(updatedCategories)
+                                setCopyNewSubcategoryName('')
+                                setTimeout(() => setMessage(''), 2000)
+                              } catch (error) {
+                                console.error('Error adding subcategory:', error)
+                                setMessage('서브카테고리 추가에 실패했습니다.')
+                              }
+                            }}
+                          >
+                            <input
+                              type="text"
+                              value={copyNewSubcategoryName}
+                              onChange={(e) => setCopyNewSubcategoryName(e.target.value)}
+                              placeholder="서브카테고리 추가..."
+                              className="subcategory-input"
+                            />
+                            {copyNewSubcategoryName.trim() && (
+                              <button type="submit" className="add-btn-small" title="추가">
+                                <FaPlus />
+                              </button>
+                            )}
+                          </form>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })()}
+                <div className="form-actions">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowCopyModal(false)
+                      setCopyTargetCategory('')
+                      setCopyTargetSubcategory('')
+                      setCopyNewSubcategoryName('')
+                      setCopyEditingSubcategory(null)
+                      setCopyEditingSubcategoryName('')
+                    }}
+                  >
+                    취소
+                  </button>
+                  <button type="submit">카피 실행</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {showConfirmModal && (
+          <div className="modal-overlay" onClick={() => {
+            setShowConfirmModal(false)
+            setConfirmMessage('')
+            confirmCallbackRef.current = null
+          }}>
+            <div className="modal-content confirm-modal" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-header">
+                <h2>확인</h2>
+                <button
+                  className="close-btn"
+                  onClick={() => {
+                    setShowConfirmModal(false)
+                    setConfirmMessage('')
+                    confirmCallbackRef.current = null
+                  }}
+                >
+                  <FaTimes />
+                </button>
+              </div>
+              <div className="confirm-message">
+                <p>{confirmMessage}</p>
+              </div>
+              <div className="form-actions">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowConfirmModal(false)
+                    setConfirmMessage('')
+                    confirmCallbackRef.current = null
+                  }}
+                  className="cancel-btn"
+                >
+                  취소
+                </button>
+                {confirmCallbackRef.current && (
+                  <button
+                    type="button"
+                    onClick={async (e) => {
+                      e.stopPropagation()
+                      const callback = confirmCallbackRef.current
+                      if (typeof callback === 'function') {
+                        await callback()
+                      }
+                      setShowConfirmModal(false)
+                      setConfirmMessage('')
+                      confirmCallbackRef.current = null
+                    }}
+                    className="confirm-btn"
+                  >
+                    확인
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         {showRecent && recentProjects.length > 0 && (
           <section className="section">
             <h2 className="section-title">Recent</h2>
@@ -1563,14 +1966,24 @@ function App() {
           <div className="section-header">
             <h2 className="section-title">All Projects</h2>
             {isAllowed && filteredProjects.length > 0 && (
-              <button
-                className={`sort-mode-btn ${sortMode ? 'active' : ''}`}
-                onClick={toggleSortMode}
-                title={sortMode ? '정렬 모드 종료' : '순서 변경 모드'}
-                style={{ color: sortMode ? '#f44336' : selectedCategoryColor }}
-              >
-                {sortMode ? <FaTimes /> : <FaArrowsAlt />}
-              </button>
+              <div className="section-header-buttons">
+                <button
+                  className={`copy-mode-btn ${copyMode ? 'active' : ''}`}
+                  onClick={toggleCopyMode}
+                  title={copyMode ? (selectedProjectsForCopy.length > 0 ? '카피 실행' : '카피 모드 종료') : '프로젝트 카피 모드'}
+                  style={{ color: copyMode ? '#4caf50' : selectedCategoryColor }}
+                >
+                  <FaCopy />
+                </button>
+                <button
+                  className={`sort-mode-btn ${sortMode ? 'active' : ''}`}
+                  onClick={toggleSortMode}
+                  title={sortMode ? '정렬 모드 종료' : '순서 변경 모드'}
+                  style={{ color: sortMode ? '#f44336' : selectedCategoryColor }}
+                >
+                  {sortMode ? <FaTimes /> : <FaArrowsAlt />}
+                </button>
+              </div>
             )}
           </div>
           {filteredProjects.length === 0 ? (
@@ -1595,6 +2008,9 @@ function App() {
                   onDragLeave={handleDragLeave}
                   onDrop={handleDrop}
                   onDragEnd={handleDragEnd}
+                  copyMode={copyMode}
+                  isChecked={selectedProjectsForCopy.includes(project.id)}
+                  onCheck={handleProjectCheck}
                 />
               ))}
             </div>
@@ -1622,7 +2038,10 @@ function ProjectCard({
   onDragOver,
   onDragLeave,
   onDrop,
-  onDragEnd
+  onDragEnd,
+  copyMode,
+  isChecked,
+  onCheck
 }) {
   // 프로젝트 색상 또는 카테고리 색상 가져오기
   const getProjectColor = () => {
@@ -1642,9 +2061,9 @@ function ProjectCard({
   
   const projectColor = getProjectColor()
   
-  // 정렬 모드일 때는 클릭 이벤트 비활성화
+  // 정렬 모드 또는 카피 모드일 때는 클릭 이벤트 비활성화
   const handleCardClick = (e) => {
-    if (sortMode) {
+    if (sortMode || copyMode) {
       e.preventDefault()
       e.stopPropagation()
       return
@@ -1654,7 +2073,7 @@ function ProjectCard({
   
   return (
     <div 
-      className={`project-card ${!isAllowed ? 'not-allowed' : ''} ${sortMode ? 'draggable' : ''} ${isDragged ? 'dragging' : ''} ${isDraggedOver ? 'drag-over' : ''}`}
+      className={`project-card ${!isAllowed ? 'not-allowed' : ''} ${sortMode ? 'draggable' : ''} ${isDragged ? 'dragging' : ''} ${isDraggedOver ? 'drag-over' : ''} ${copyMode && isChecked ? 'checked' : ''}`}
       draggable={sortMode && isAllowed}
       onDragStart={(e) => onDragStart?.(e, project.id)}
       onDragOver={(e) => onDragOver?.(e, project.id)}
@@ -1662,11 +2081,6 @@ function ProjectCard({
       onDrop={(e) => onDrop?.(e, project.id)}
       onDragEnd={onDragEnd}
     >
-      {sortMode && isAllowed && (
-        <div className="drag-handle">
-          <FaGripVertical />
-        </div>
-      )}
       <div className="project-header">
         <span 
           className="project-index"
@@ -1674,7 +2088,7 @@ function ProjectCard({
         >
           #{project.index}
         </span>
-        {isAllowed && !sortMode && (
+        {isAllowed && !sortMode && !copyMode && (
           <div className="project-actions">
             <button
               className={`favorite-btn ${project.isFavorite ? 'active' : ''}`}
@@ -1736,6 +2150,23 @@ function ProjectCard({
           </span>
         )}
       </div>
+      {sortMode && isAllowed && (
+        <div className="drag-handle">
+          <FaGripVertical />
+        </div>
+      )}
+      {copyMode && isAllowed && (
+        <label className="project-checkbox checkbox-label" onClick={(e) => e.stopPropagation()}>
+          <input
+            type="checkbox"
+            checked={isChecked || false}
+            onChange={() => onCheck?.(project.id)}
+          />
+          <span>
+            <FaCheck className="checkbox-icon" />
+          </span>
+        </label>
+      )}
     </div>
   )
 }
