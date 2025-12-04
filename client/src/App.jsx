@@ -989,6 +989,48 @@ function App() {
     }
   }
 
+  // 현재 화면에 보이는 프로젝트 일괄 선택/해제
+  const handleSelectAllVisible = (checked) => {
+    const visibleProjectIds = filteredProjects.map(p => p.id)
+    
+    if (copyMode) {
+      if (checked) {
+        // 현재 선택된 것에 추가 (중복 제거)
+        setSelectedProjectsForCopy(prev => {
+          const combined = [...new Set([...prev, ...visibleProjectIds])]
+          return combined
+        })
+      } else {
+        // 현재 화면에 보이는 프로젝트들만 제거
+        setSelectedProjectsForCopy(prev => prev.filter(id => !visibleProjectIds.includes(id)))
+      }
+    } else if (deleteMode) {
+      if (checked) {
+        // 현재 선택된 것에 추가 (중복 제거)
+        setSelectedProjectsForDelete(prev => {
+          const combined = [...new Set([...prev, ...visibleProjectIds])]
+          return combined
+        })
+      } else {
+        // 현재 화면에 보이는 프로젝트들만 제거
+        setSelectedProjectsForDelete(prev => prev.filter(id => !visibleProjectIds.includes(id)))
+      }
+    }
+  }
+
+  // 현재 화면에 보이는 프로젝트가 모두 선택되었는지 확인
+  const areAllVisibleSelected = () => {
+    const visibleProjectIds = filteredProjects.map(p => p.id)
+    if (visibleProjectIds.length === 0) return false
+    
+    if (copyMode) {
+      return visibleProjectIds.every(id => selectedProjectsForCopy.includes(id))
+    } else if (deleteMode) {
+      return visibleProjectIds.every(id => selectedProjectsForDelete.includes(id))
+    }
+    return false
+  }
+
   // 복사 모달에서 서브카테고리 수정 핸들러
   const handleCopyModalUpdateSubcategory = async (oldSubcategoryName) => {
     if (!copyEditingSubcategoryName.trim()) return
@@ -2167,7 +2209,21 @@ function App() {
 
         <section className="section">
           <div className="section-header">
-            <h2 className="section-title">All Projects</h2>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              {(copyMode || deleteMode) && isAllowed && filteredProjects.length > 0 && (
+                <label className="checkbox-label" onClick={(e) => e.stopPropagation()}>
+                  <input
+                    type="checkbox"
+                    checked={areAllVisibleSelected()}
+                    onChange={(e) => handleSelectAllVisible(e.target.checked)}
+                  />
+                  <span>
+                    <FaCheck className="checkbox-icon" />
+                  </span>
+                </label>
+              )}
+              <h2 className="section-title">All Projects</h2>
+            </div>
             {isAllowed && filteredProjects.length > 0 && (
               <div className="section-header-buttons">
                 <button
