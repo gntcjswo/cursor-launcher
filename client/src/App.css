@@ -382,7 +382,7 @@ linear infinite;
 }
 
 .project-card.not-allowed .project-header {
-  pointer-events: auto;
+  /* pointer-events: auto; */
 }
 
 .project-card:hover {
