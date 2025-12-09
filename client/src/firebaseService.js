@@ -102,21 +102,18 @@ export const getProjects = async () => {
 
 export const addProject = async (project) => {
 	try {
-		// 현재 모든 프로젝트를 가져와서 해당 카테고리의 최대 번호 찾기
+		// 현재 모든 프로젝트를 가져와서 전체 데이터베이스의 최대 번호 찾기
 		const projectsSnapshot = await getDocs(collection(db, PROJECTS_COLLECTION))
 		const projects = projectsSnapshot.docs.map(doc => ({
 			...doc.data(),
 			number: doc.data().number || 0
 		}))
 
-		// 해당 카테고리의 프로젝트만 필터링
-		const categoryProjects = projects.filter(p => p.category === project.category)
-
-		// 해당 카테고리의 최대 번호 계산
-		const numbers = categoryProjects.map(p => p.number || 0).filter(n => n > 0)
+		// 전체 데이터베이스의 최대 번호 계산
+		const numbers = projects.map(p => p.number || 0).filter(n => n > 0)
 		const maxNumber = numbers.length > 0 ? Math.max(...numbers) : 0
 
-		// 새 프로젝트 번호 = 해당 카테고리의 최대 번호 + 1
+		// 새 프로젝트 번호 = 전체 데이터베이스의 최대 번호 + 1
 		const newNumber = maxNumber + 1
 
 		const projectData = {
@@ -141,7 +138,40 @@ export const updateProject = async (id, project) => {
 }
 
 export const deleteProject = async (id) => {
-	await deleteDoc(doc(db, PROJECTS_COLLECTION, id))
+	try {
+		// 삭제할 프로젝트의 번호 확인
+		const projectRef = doc(db, PROJECTS_COLLECTION, id)
+		const projectDoc = await getDoc(projectRef)
+		if (!projectDoc.exists()) {
+			throw new Error('Project not found')
+		}
+		
+		const deletedNumber = projectDoc.data().number || 0
+		
+		// 프로젝트 삭제
+		await deleteDoc(projectRef)
+		
+		// 삭제된 번호보다 큰 번호를 가진 프로젝트들의 번호를 하나씩 감소
+		if (deletedNumber > 0) {
+			const projectsSnapshot = await getDocs(collection(db, PROJECTS_COLLECTION))
+			const updatePromises = []
+			
+			projectsSnapshot.docs.forEach(doc => {
+				const data = doc.data()
+				const projectNumber = data.number || 0
+				if (projectNumber > deletedNumber) {
+					updatePromises.push(
+						updateDoc(doc.ref, { number: projectNumber - 1 })
+					)
+				}
+			})
+			
+			await Promise.all(updatePromises)
+		}
+	} catch (error) {
+		console.error('Error in deleteProject:', error)
+		throw error
+	}
 }
 
 // 카테고리 관련

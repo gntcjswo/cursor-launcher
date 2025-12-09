@@ -250,24 +250,24 @@ function App() {
       // 백엔드 API 호출 시도
       try {
         const response = await fetch(`${apiUrl}/api/open`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            projectPath: project.path,
-            projectName: project.name,
-          }),
-        })
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          projectPath: project.path,
+          projectName: project.name,
+        }),
+      })
 
-        if (response.ok) {
-          setMessage(`${project.name} 프로젝트를 열었습니다.`)
-          setTimeout(() => {
-            setMessage('')
-            loadProjects()
-          }, 1000)
+      if (response.ok) {
+        setMessage(`${project.name} 프로젝트를 열었습니다.`)
+        setTimeout(() => {
+          setMessage('')
+          loadProjects()
+        }, 1000)
           return
-        } else {
+      } else {
           throw new Error('API 응답 오류')
         }
       } catch (apiError) {
@@ -548,18 +548,18 @@ function App() {
     showConfirm(
       `"${project.name}" 프로젝트를 삭제하시겠습니까?`,
       async () => {
-        try {
-          // 프로젝트 삭제 (isFavorite, isRecent 정보도 함께 삭제됨)
-          await deleteProject(project.id)
-          setMessage('프로젝트가 삭제되었습니다.')
-          setTimeout(() => {
-            setMessage('')
-            loadProjects()
-          }, 1000)
-        } catch (error) {
-          console.error('Error deleting project:', error)
-          setMessage('프로젝트 삭제에 실패했습니다.')
-        }
+    try {
+      // 프로젝트 삭제 (isFavorite, isRecent 정보도 함께 삭제됨)
+      await deleteProject(project.id)
+      setMessage('프로젝트가 삭제되었습니다.')
+      setTimeout(() => {
+        setMessage('')
+        loadProjects()
+      }, 1000)
+    } catch (error) {
+      console.error('Error deleting project:', error)
+      setMessage('프로젝트 삭제에 실패했습니다.')
+    }
       }
     )
   }
@@ -769,24 +769,26 @@ function App() {
     }
   }
 
-  // 프로젝트 순서 변경 함수
+  // 프로젝트 순서 변경 함수 (전체 데이터베이스 기준)
   const applyProjectReorder = async (targetProjectId, insertPosition) => {
     if (!draggedProjectId || !targetProjectId || draggedProjectId === targetProjectId) {
       return
     }
 
     try {
-      const allProjects = [...projects]
+      // 전체 데이터베이스에서 프로젝트 가져오기
+      const allProjects = await getProjects()
+      const sortedProjects = allProjects
         .map(p => ({ ...p }))
         .sort((a, b) => (a.number || 0) - (b.number || 0))
       
-      const draggedIndex = allProjects.findIndex(p => p.id === draggedProjectId)
-      const targetIndex = allProjects.findIndex(p => p.id === targetProjectId)
+      const draggedIndex = sortedProjects.findIndex(p => p.id === draggedProjectId)
+      const targetIndex = sortedProjects.findIndex(p => p.id === targetProjectId)
       
       if (draggedIndex === -1 || targetIndex === -1) return
       
       // 드래그한 프로젝트 제거
-      const [draggedProject] = allProjects.splice(draggedIndex, 1)
+      const [draggedProject] = sortedProjects.splice(draggedIndex, 1)
       
       // 삽입 위치 결정 (draggedProject 제거 후 인덱스 조정)
       let insertIndex
@@ -805,10 +807,10 @@ function App() {
       }
       
       // 프로젝트 삽입
-      allProjects.splice(insertIndex, 0, draggedProject)
+      sortedProjects.splice(insertIndex, 0, draggedProject)
       
-      // 새로운 번호 할당
-      const projectsToUpdate = allProjects.map((project, index) => ({
+      // 새로운 번호 할당 (전체 데이터베이스 기준)
+      const projectsToUpdate = sortedProjects.map((project, index) => ({
         ...project,
         newNumber: index + 1
       }))
@@ -949,8 +951,13 @@ function App() {
 
     try {
       const projectsToDelete = projects.filter(p => selectedProjectsForDelete.includes(p.id))
-      const deletePromises = projectsToDelete.map(project => deleteProject(project.id))
-      await Promise.all(deletePromises)
+      // 번호를 내림차순으로 정렬하여 큰 번호부터 삭제 (번호 재정렬이 올바르게 작동하도록)
+      const sortedProjectsToDelete = [...projectsToDelete].sort((a, b) => (b.number || 0) - (a.number || 0))
+      
+      // 순차적으로 삭제 (번호 재정렬이 올바르게 작동하도록)
+      for (const project of sortedProjectsToDelete) {
+        await deleteProject(project.id)
+      }
       
       setMessage(`${selectedProjectsForDelete.length}개 프로젝트가 삭제되었습니다.`)
       
@@ -1143,33 +1150,33 @@ function App() {
     showConfirm(
       `"${categoryName}" 카테고리를 삭제하시겠습니까?`,
       async () => {
-        try {
-          // 해당 카테고리의 프로젝트 확인
-          const allProjects = await getProjects()
-          const projectsInCategory = allProjects.filter(p => p.category === categoryName)
+    try {
+      // 해당 카테고리의 프로젝트 확인
+      const allProjects = await getProjects()
+      const projectsInCategory = allProjects.filter(p => p.category === categoryName)
 
-          if (projectsInCategory.length > 0) {
-            setMessage(`프로젝트가 있는 카테고리는 삭제할 수 없습니다. (${projectsInCategory.length}개 프로젝트)`)
-            return
-          }
+      if (projectsInCategory.length > 0) {
+        setMessage(`프로젝트가 있는 카테고리는 삭제할 수 없습니다. (${projectsInCategory.length}개 프로젝트)`)
+        return
+      }
 
-          await deleteCategory(categoryName)
-          const updatedCategories = await getCategories()
-          setCategories(updatedCategories)
-          
-          if (selectedCategory === categoryName) {
-            setSelectedCategory(updatedCategories[0] || null)
-          }
-        
-          setMessage('카테고리가 삭제되었습니다.')
-          setTimeout(() => {
-            setMessage('')
-            loadProjects()
-          }, 1000)
-        } catch (error) {
-          console.error('Error deleting category:', error)
-          setMessage('카테고리 삭제에 실패했습니다.')
-        }
+      await deleteCategory(categoryName)
+      const updatedCategories = await getCategories()
+      setCategories(updatedCategories)
+      
+      if (selectedCategory === categoryName) {
+        setSelectedCategory(updatedCategories[0] || null)
+      }
+      
+      setMessage('카테고리가 삭제되었습니다.')
+      setTimeout(() => {
+        setMessage('')
+        loadProjects()
+      }, 1000)
+    } catch (error) {
+      console.error('Error deleting category:', error)
+      setMessage('카테고리 삭제에 실패했습니다.')
+    }
       }
     )
   }
@@ -1741,34 +1748,34 @@ function App() {
                       ) : (
                         <>
                           <div className="category-main">
-                            <div className="category-info">
-                              <span 
-                                className="category-color-indicator"
-                                style={{ backgroundColor: categoryColor }}
-                              ></span>
-                              <span>{categoryName}</span>
-                            </div>
-                            <div className="category-actions">
-                              <button
-                                className="edit-btn"
-                                onClick={() => handleEditCategory(category)}
-                                title="수정"
-                              >
-                                <FaEdit />
-                              </button>
-                              <button
-                                className="delete-btn"
-                                onClick={() => handleDeleteCategory(categoryName)}
-                                disabled={index === 0 || projects.some(p => p.category === categoryName)}
-                                title={
-                                  index === 0 
-                                    ? '첫 번째 카테고리는 삭제할 수 없습니다' 
-                                    : projects.some(p => p.category === categoryName) 
-                                      ? '프로젝트가 있는 카테고리는 삭제할 수 없습니다' 
-                                      : '삭제'
-                                }
-                              >
-                                <FaTrash />
+                          <div className="category-info">
+                            <span 
+                              className="category-color-indicator"
+                              style={{ backgroundColor: categoryColor }}
+                            ></span>
+                            <span>{categoryName}</span>
+                          </div>
+                          <div className="category-actions">
+                            <button
+                              className="edit-btn"
+                              onClick={() => handleEditCategory(category)}
+                              title="수정"
+                            >
+                              <FaEdit />
+                            </button>
+                            <button
+                              className="delete-btn"
+                              onClick={() => handleDeleteCategory(categoryName)}
+                              disabled={index === 0 || projects.some(p => p.category === categoryName)}
+                              title={
+                                index === 0 
+                                  ? '첫 번째 카테고리는 삭제할 수 없습니다' 
+                                  : projects.some(p => p.category === categoryName) 
+                                    ? '프로젝트가 있는 카테고리는 삭제할 수 없습니다' 
+                                    : '삭제'
+                              }
+                            >
+                              <FaTrash />
                               </button>
                             </div>
                           </div>
@@ -1825,14 +1832,14 @@ function App() {
                                                     title="서브카테고리 삭제"
                                                   >
                                                     <FaTimes />
-                                                  </button>
-                                                </div>
-                                              </>
-                                            )}
-                                          </div>
-                                        )
-                                      })}
-                                    </div>
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
                                   )}
                                   <form 
                                     className="subcategory-add-form"
@@ -2222,7 +2229,7 @@ function App() {
                   </span>
                 </label>
               )}
-              <h2 className="section-title">All Projects</h2>
+          <h2 className="section-title">All Projects</h2>
             </div>
             {isAllowed && filteredProjects.length > 0 && (
               <div className="section-header-buttons">
