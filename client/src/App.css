@@ -361,6 +361,8 @@ linear infinite;
 
 .project-card {
   position: relative;
+  display: flex;
+  flex-direction: column;
   background: white;
   border: 2px solid #fff;
   border-radius: 12px;
@@ -478,6 +480,7 @@ linear infinite;
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-shrink: 0;
   margin-bottom: 0.75rem;
 }
 
@@ -543,6 +546,9 @@ linear infinite;
 }
 
 .project-content {
+  position: relative;
+  flex: auto;
+  padding-bottom: calc(32px + 1.5rem);
   cursor: pointer;
 }
 
@@ -578,6 +584,10 @@ linear infinite;
   font-size: 1.125rem;
 }
 
+.overflow-hidden {
+  overflow: hidden !important;
+}
+
 .modal-overlay {
   position: fixed;
   top: 0;
@@ -586,17 +596,22 @@ linear infinite;
   bottom: 0;
   background: rgba(0, 0, 0, 0.5);
   display: flex;
-  align-items: center;
   justify-content: center;
+  overflow-y: auto;
   z-index: 1000;
+}
+
+.modal-inner {
+  margin: auto;
+  padding: 40px;
+  width: 90%;
+  max-width: 580px;
 }
 
 .modal-content {
   background: white;
   border-radius: 12px;
   padding: 2rem;
-  width: 90%;
-  max-width: 500px;
   box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
 }
 
@@ -1070,5 +1085,100 @@ linear infinite;
   font-size: 0.875rem;
   color: #666;
   font-style: italic;
+}
+
+/* 프로젝트 액션 버튼 스타일 */
+.project-actions-bottom {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid #e0e0e0;
+  justify-content: flex-start;
+}
+
+.action-btn {
+  background: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 6px;
+  padding: 0.5rem;
+  cursor: pointer;
+  color: #6c757d;
+  font-size: 0.875rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  min-width: 32px;
+  height: 32px;
+}
+
+.action-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.memo-btn {
+  color: #ffc107;
+  border-color: #ffc107;
+}
+
+.memo-btn:hover {
+  background: #fff3cd;
+  border-color: #ffb300;
+  color: #ff8f00;
+}
+
+.folder-btn {
+  color: #17a2b8;
+  border-color: #17a2b8;
+}
+
+.folder-btn:hover {
+  background: #d1ecf1;
+  border-color: #138496;
+  color: #0c7489;
+}
+
+.json-btn {
+  color: #28a745;
+  border-color: #28a745;
+}
+
+.json-btn:hover {
+  background: #d4edda;
+  border-color: #1e7e34;
+  color: #155724;
+}
+
+/* 메모 모달 스타일 */
+.memo-content {
+  max-height: 400px;
+  overflow-y: auto;
+  margin-bottom: 1.5rem;
+}
+
+/* textarea 스타일 */
+textarea {
+  width: 100%;
+  padding: 0.75rem;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 1rem;
+  transition: border-color 0.2s;
+  line-height: 1.5;
+}
+
+textarea:focus {
+  outline: none;
+  border-color: var(--theme-color, #667eea);
+}
+
+textarea::placeholder {
+  color: #999;
 }
 

@@ -174,6 +174,98 @@ app.post('/api/open', async (req, res) => {
   }
 });
 
+// 폴더 열기
+app.post('/api/open-folder', async (req, res) => {
+  try {
+    const { projectPath } = req.body;
+
+    if (!projectPath) {
+      return res.status(400).json({ error: 'Project path is required' });
+    }
+
+    // 경로 존재 확인
+    if (!(await fs.pathExists(projectPath))) {
+      return res.status(404).json({ error: 'Folder not found' });
+    }
+
+    // Windows에서는 explorer, macOS에서는 open, Linux에서는 xdg-open 사용
+    let command;
+    if (process.platform === 'win32') {
+      // Windows에서 경로에 공백이 있을 때 문제가 발생할 수 있으므로 대안 방법 사용
+      command = `explorer.exe "${projectPath.replace(/\//g, '\\')}"`;
+    } else if (process.platform === 'darwin') {
+      command = `open "${projectPath}"`;
+    } else {
+      command = `xdg-open "${projectPath}"`;
+    }
+
+    exec(command, (error) => {
+      if (error) {
+        console.error('Error opening folder:', error);
+        // Windows에서 explorer 실패 시 대안 방법 시도
+        if (process.platform === 'win32') {
+          const alternativeCommand = `start "" "${projectPath}"`;
+          exec(alternativeCommand, (altError) => {
+            if (altError) {
+              console.error('Alternative command also failed:', altError);
+              return res.status(500).json({ error: 'Failed to open folder' });
+            }
+            res.json({ success: true });
+          });
+        } else {
+          return res.status(500).json({ error: 'Failed to open folder' });
+        }
+      } else {
+        res.json({ success: true });
+      }
+    });
+  } catch (error) {
+    console.error('Error opening folder:', error);
+    res.status(500).json({ error: 'Failed to open folder' });
+  }
+});
+
+// JSON 파일 열기 (notepad로)
+app.post('/api/open-json', async (req, res) => {
+  try {
+    const { projectPath, jsonPath } = req.body;
+
+    if (!projectPath || !jsonPath) {
+      return res.status(400).json({ error: 'Project path and JSON path are required' });
+    }
+
+    // 상대 경로를 절대 경로로 변환
+    const fullPath = path.resolve(projectPath, jsonPath);
+    
+    // 파일 존재 확인
+    if (!(await fs.pathExists(fullPath))) {
+      return res.status(404).json({ error: 'JSON file not found' });
+    }
+
+    // Windows에서는 notepad, macOS/Linux에서는 기본 텍스트 에디터 사용
+    let command;
+    if (process.platform === 'win32') {
+      command = `notepad "${fullPath}"`;
+    } else if (process.platform === 'darwin') {
+      command = `open -a TextEdit "${fullPath}"`;
+    } else {
+      // Linux에서는 gedit, nano, 또는 기본 에디터 사용
+      command = `gedit "${fullPath}" || nano "${fullPath}" || xdg-open "${fullPath}"`;
+    }
+
+    exec(command, (error) => {
+      if (error) {
+        console.error('Error opening JSON file:', error);
+        return res.status(500).json({ error: 'Failed to open JSON file' });
+      }
+      res.json({ success: true });
+    });
+  } catch (error) {
+    console.error('Error opening JSON file:', error);
+    res.status(500).json({ error: 'Failed to open JSON file' });
+  }
+});
+
 // 즐겨찾기 토글
 app.post('/api/favorite', async (req, res) => {
   try {
@@ -206,7 +298,7 @@ app.post('/api/favorite', async (req, res) => {
 // 프로젝트 추가
 app.post('/api/projects', async (req, res) => {
   try {
-    const { projectName, projectPath, category } = req.body;
+    const { projectName, projectPath, category, subcategory, color, memo, jsonPath } = req.body;
 
     if (!projectName || !projectPath || !category) {
       return res.status(400).json({ error: 'Project name, path, and category are required' });
@@ -224,7 +316,11 @@ app.post('/api/projects', async (req, res) => {
       id: Date.now(),
       name: projectName,
       path: projectPath,
-      category
+      category,
+      subcategory: subcategory || null,
+      color: color || null,
+      memo: memo || null,
+      jsonPath: jsonPath || null
     };
 
     projects.push(newProject);
@@ -241,7 +337,7 @@ app.post('/api/projects', async (req, res) => {
 app.put('/api/projects/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { projectName, projectPath, category } = req.body;
+    const { projectName, projectPath, category, subcategory, color, memo, jsonPath } = req.body;
 
     if (!projectName || !projectPath || !category) {
       return res.status(400).json({ error: 'Project name, path, and category are required' });
@@ -287,7 +383,11 @@ app.put('/api/projects/:id', async (req, res) => {
       ...projects[projectIndex],
       name: projectName,
       path: projectPath,
-      category
+      category,
+      subcategory: subcategory || null,
+      color: color || null,
+      memo: memo || null,
+      jsonPath: jsonPath || null
     };
 
     await fs.writeFile(projectsFile, JSON.stringify(projects, null, 2), 'utf8');

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { FaStar, FaRegStar, FaPlus, FaTimes, FaEdit, FaTrash, FaFolder, FaSignInAlt, FaSignOutAlt, FaUserShield, FaCheck, FaChevronDown, FaArrowsAlt, FaGripVertical, FaCopy } from 'react-icons/fa'
+import { FaStar, FaRegStar, FaPlus, FaTimes, FaEdit, FaTrash, FaFolder, FaSignInAlt, FaSignOutAlt, FaUserShield, FaCheck, FaChevronDown, FaArrowsAlt, FaGripVertical, FaCopy, FaStickyNote, FaFolderOpen, FaFileCode } from 'react-icons/fa'
 import { signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth'
 import { auth, googleProvider } from './firebase'
 import {
@@ -43,6 +43,8 @@ function App() {
   const [newProjectCategory, setNewProjectCategory] = useState('')
   const [newProjectSubcategory, setNewProjectSubcategory] = useState('')
   const [newProjectColor, setNewProjectColor] = useState('')
+  const [newProjectMemo, setNewProjectMemo] = useState('')
+  const [newProjectJsonPath, setNewProjectJsonPath] = useState('')
   const [newCategoryName, setNewCategoryName] = useState('')
   const [editingCategory, setEditingCategory] = useState(null)
   const [editingCategoryName, setEditingCategoryName] = useState('')
@@ -72,6 +74,8 @@ function App() {
   const [copyEditingSubcategoryName, setCopyEditingSubcategoryName] = useState('')
   const [showConfirmModal, setShowConfirmModal] = useState(false)
   const [confirmMessage, setConfirmMessage] = useState('')
+  const [showMemoModal, setShowMemoModal] = useState(false)
+  const [memoProject, setMemoProject] = useState(null)
   const confirmCallbackRef = useRef(null)
   const isInitialLoad = useRef(true)
   const dragTimerRef = useRef(null)
@@ -129,6 +133,22 @@ function App() {
     loadProjects()
     return () => unsubscribe()
   }, [])
+
+  // 모달 상태에 따른 body overflow 제어
+  useEffect(() => {
+    const isAnyModalOpen = showAddModal || showEditModal || showCategoryModal || showCopyModal || showConfirmModal || showMemoModal;
+    
+    if (isAnyModalOpen) {
+      document.body.classList.add('overflow-hidden');
+    } else {
+      document.body.classList.remove('overflow-hidden');
+    }
+
+    // 컴포넌트 언마운트 시 정리
+    return () => {
+      document.body.classList.remove('overflow-hidden');
+    };
+  }, [showAddModal, showEditModal, showCategoryModal, showCopyModal, showConfirmModal, showMemoModal]);
 
   // body 배경색 동적 변경
   useEffect(() => {
@@ -458,7 +478,9 @@ function App() {
         path: newProjectPath.trim(),
         category: newProjectCategory,
         subcategory: newProjectSubcategory || null,
-        color: newProjectColor || null
+        color: newProjectColor || null,
+        memo: newProjectMemo.trim() || null,
+        jsonPath: newProjectJsonPath.trim() || null
       })
 
       setMessage('프로젝트가 추가되었습니다.')
@@ -467,6 +489,8 @@ function App() {
       setNewProjectPath('')
       setNewProjectSubcategory('')
       setNewProjectColor('')
+      setNewProjectMemo('')
+      setNewProjectJsonPath('')
       setShowAddModal(false)
       setTimeout(() => {
         setMessage('')
@@ -485,6 +509,8 @@ function App() {
     setNewProjectCategory(project.category)
     setNewProjectSubcategory(project.subcategory || '')
     setNewProjectColor(project.color || '')
+    setNewProjectMemo(project.memo || '')
+    setNewProjectJsonPath(project.jsonPath || '')
     setShowEditModal(true)
   }
 
@@ -496,6 +522,8 @@ function App() {
     setNewProjectCategory('')
     setNewProjectSubcategory('')
     setNewProjectColor('')
+    setNewProjectMemo('')
+    setNewProjectJsonPath('')
   }
 
   const handleUpdateProject = async (e) => {
@@ -518,7 +546,9 @@ function App() {
         path: newProjectPath.trim(),
         category: newProjectCategory,
         subcategory: newProjectSubcategory || null,
-        color: newProjectColor || null
+        color: newProjectColor || null,
+        memo: newProjectMemo.trim() || null,
+        jsonPath: newProjectJsonPath.trim() || null
       })
 
       setMessage('프로젝트가 수정되었습니다.')
@@ -529,6 +559,8 @@ function App() {
       setNewProjectCategory('')
       setNewProjectSubcategory('')
       setNewProjectColor('')
+      setNewProjectMemo('')
+      setNewProjectJsonPath('')
       setTimeout(() => {
         setMessage('')
         loadProjects()
@@ -1141,6 +1173,96 @@ function App() {
     }
   }
 
+  // 메모 보기 핸들러
+  const handleViewMemo = (project) => {
+    setMemoProject(project)
+    setShowMemoModal(true)
+  }
+
+  // 폴더 열기 핸들러
+  const handleOpenFolder = async (project) => {
+    if (!isAllowed) {
+      setMessage('권한이 없습니다. 허용된 계정으로 로그인해주세요.')
+      return
+    }
+
+    try {
+      // API URL 설정
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+      
+      // 백엔드 API 호출
+      const response = await fetch(`${apiUrl}/api/open-folder`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          projectPath: project.path,
+        }),
+      })
+
+      if (response.ok) {
+        setMessage(`${project.name} 폴더가 열렸습니다.`)
+      } else {
+        throw new Error('API 응답 오류')
+      }
+    } catch (error) {
+      console.warn('백엔드 서버에 연결할 수 없습니다.', error)
+      // 경로를 클립보드에 복사
+      try {
+        await navigator.clipboard.writeText(project.path)
+        setMessage(`프로젝트 경로가 클립보드에 복사되었습니다.\n\n백엔드 서버가 실행 중이 아닙니다. 직접 폴더를 열어주세요.\n경로: ${project.path}`)
+      } catch (clipboardError) {
+        setMessage(`프로젝트 경로: ${project.path}\n\n백엔드 서버가 실행 중이 아닙니다. 직접 폴더를 열어주세요.`)
+      }
+    }
+  }
+
+  // JSON 파일 열기 핸들러
+  const handleOpenJsonFile = async (project) => {
+    if (!isAllowed) {
+      setMessage('권한이 없습니다. 허용된 계정으로 로그인해주세요.')
+      return
+    }
+
+    if (!project.jsonPath) {
+      setMessage('JSON 파일 경로가 설정되지 않았습니다.')
+      return
+    }
+
+    try {
+      // API URL 설정
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+      
+      // 백엔드 API 호출
+      const response = await fetch(`${apiUrl}/api/open-json`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          projectPath: project.path,
+          jsonPath: project.jsonPath,
+        }),
+      })
+
+      if (response.ok) {
+        setMessage(`${project.jsonPath} 파일이 열렸습니다.`)
+      } else {
+        throw new Error('API 응답 오류')
+      }
+    } catch (error) {
+      console.warn('백엔드 서버에 연결할 수 없습니다.', error)
+      const fullPath = `${project.path}/${project.jsonPath.replace(/^[\/\\]/, '')}`
+      try {
+        await navigator.clipboard.writeText(fullPath)
+        setMessage(`파일 경로가 클립보드에 복사되었습니다.\n\n백엔드 서버가 실행 중이 아닙니다. 직접 파일을 열어주세요.\n경로: ${fullPath}`)
+      } catch (clipboardError) {
+        setMessage(`파일 경로: ${fullPath}\n\n백엔드 서버가 실행 중이 아닙니다. 직접 파일을 열어주세요.`)
+      }
+    }
+  }
+
   const handleDeleteCategory = (categoryName) => {
     if (!isAllowed) {
       setMessage('권한이 없습니다. 허용된 계정으로 로그인해주세요.')
@@ -1278,6 +1400,8 @@ function App() {
                         setNewProjectName('')
                         setNewProjectPath('')
                         setNewProjectColor('')
+                        setNewProjectMemo('')
+                        setNewProjectJsonPath('')
                         // 카테고리는 마지막 선택한 것을 유지 (또는 현재 선택된 카테고리)
                         if (!newProjectCategory) {
                           const firstCategory = categories[0]
@@ -1419,7 +1543,8 @@ function App() {
         {/* 프로젝트 추가 모달 */}
         {showAddModal && (
           <div className="modal-overlay">
-            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-inner">
+              <div className="modal-content" onClick={(e) => e.stopPropagation()}>
               <div className="modal-header">
                 <h2>프로젝트 추가</h2>
                 <button 
@@ -1428,6 +1553,8 @@ function App() {
                     setNewProjectName('')
                     setNewProjectPath('')
                     setNewProjectColor('')
+                    setNewProjectMemo('')
+                    setNewProjectJsonPath('')
                     setShowAddModal(false)
                   }}
                 >
@@ -1527,6 +1654,27 @@ function App() {
                   </div>
                   <p className="form-help-text">색상을 지정하지 않으면 카테고리의 테마 색상이 사용됩니다.</p>
                 </div>
+                <div className="form-group">
+                  <label>메모 (선택사항)</label>
+                  <textarea
+                    value={newProjectMemo}
+                    onChange={(e) => setNewProjectMemo(e.target.value)}
+                    placeholder="프로젝트에 대한 메모를 입력하세요..."
+                    rows={4}
+                    style={{ resize: 'vertical', fontFamily: 'inherit' }}
+                  />
+                  <p className="form-help-text">메모를 입력하면 프로젝트 카드에 메모 보기 버튼이 표시됩니다.</p>
+                </div>
+                <div className="form-group">
+                  <label>JSON 파일 경로 (선택사항)</label>
+                  <input
+                    type="text"
+                    value={newProjectJsonPath}
+                    onChange={(e) => setNewProjectJsonPath(e.target.value)}
+                    placeholder="예: .vscode/sftp.json"
+                  />
+                  <p className="form-help-text">프로젝트 경로를 기준으로 한 상대 경로를 입력하세요. 입력하면 JSON 파일 열기 버튼이 표시됩니다.</p>
+                </div>
                 <div className="form-actions">
                   <button 
                     type="button" 
@@ -1535,6 +1683,8 @@ function App() {
                       setNewProjectPath('')
                       setNewProjectSubcategory('')
                       setNewProjectColor('')
+                      setNewProjectMemo('')
+                      setNewProjectJsonPath('')
                       setShowAddModal(false)
                     }}
                   >
@@ -1543,6 +1693,7 @@ function App() {
                   <button type="submit">추가</button>
                 </div>
               </form>
+              </div>
             </div>
           </div>
         )}
@@ -1550,7 +1701,8 @@ function App() {
         {/* 프로젝트 수정 모달 */}
         {showEditModal && editingProject && (
           <div className="modal-overlay">
-            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-inner">
+              <div className="modal-content" onClick={(e) => e.stopPropagation()}>
               <div className="modal-header">
                 <h2>프로젝트 수정</h2>
                 <button 
@@ -1664,6 +1816,27 @@ function App() {
                   </div>
                   <p className="form-help-text">색상을 지정하지 않으면 카테고리의 테마 색상이 사용됩니다.</p>
                 </div>
+                <div className="form-group">
+                  <label>메모 (선택사항)</label>
+                  <textarea
+                    value={newProjectMemo}
+                    onChange={(e) => setNewProjectMemo(e.target.value)}
+                    placeholder="프로젝트에 대한 메모를 입력하세요..."
+                    rows={4}
+                    style={{ resize: 'vertical', fontFamily: 'inherit' }}
+                  />
+                  <p className="form-help-text">메모를 입력하면 프로젝트 카드에 메모 보기 버튼이 표시됩니다.</p>
+                </div>
+                <div className="form-group">
+                  <label>JSON 파일 경로 (선택사항)</label>
+                  <input
+                    type="text"
+                    value={newProjectJsonPath}
+                    onChange={(e) => setNewProjectJsonPath(e.target.value)}
+                    placeholder="예: .vscode/sftp.json"
+                  />
+                  <p className="form-help-text">프로젝트 경로를 기준으로 한 상대 경로를 입력하세요. 입력하면 JSON 파일 열기 버튼이 표시됩니다.</p>
+                </div>
                 <div className="form-actions">
                   <button type="button" onClick={handleCancelEditProject}>
                     취소
@@ -1671,6 +1844,7 @@ function App() {
                   <button type="submit">수정</button>
                 </div>
               </form>
+              </div>
             </div>
           </div>
         )}
@@ -1678,7 +1852,8 @@ function App() {
         {/* 카테고리 관리 모달 */}
         {showCategoryModal && (
           <div className="modal-overlay" onClick={() => setShowCategoryModal(false)}>
-            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-inner">
+              <div className="modal-content" onClick={(e) => e.stopPropagation()}>
               <div className="modal-header">
                 <h2>카테고리 관리</h2>
                 <button 
@@ -1881,6 +2056,7 @@ function App() {
                   )
                 })}
               </div>
+              </div>
             </div>
           </div>
         )}
@@ -1894,7 +2070,8 @@ function App() {
             setCopyEditingSubcategory(null)
             setCopyEditingSubcategoryName('')
           }}>
-            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-inner">
+              <div className="modal-content" onClick={(e) => e.stopPropagation()}>
               <div className="modal-header">
                 <h2>프로젝트 복사</h2>
                 <button
@@ -2110,6 +2287,7 @@ function App() {
                   <button type="submit">복사 실행</button>
                 </div>
               </form>
+              </div>
             </div>
           </div>
         )}
@@ -2120,7 +2298,8 @@ function App() {
             setConfirmMessage('')
             confirmCallbackRef.current = null
           }}>
-            <div className="modal-content confirm-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-inner">
+              <div className="modal-content confirm-modal" onClick={(e) => e.stopPropagation()}>
               <div className="modal-header">
                 <h2>확인</h2>
                 <button
@@ -2168,6 +2347,56 @@ function App() {
                   </button>
                 )}
               </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 메모 모달 */}
+        {showMemoModal && memoProject && (
+          <div className="modal-overlay" onClick={() => {
+            setShowMemoModal(false)
+            setMemoProject(null)
+          }}>
+            <div className="modal-inner">
+              <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-header">
+                <h2>{memoProject.name} - 메모</h2>
+                <button
+                  className="close-btn"
+                  onClick={() => {
+                    setShowMemoModal(false)
+                    setMemoProject(null)
+                  }}
+                >
+                  <FaTimes />
+                </button>
+              </div>
+              <div className="memo-content">
+                <pre style={{ 
+                  whiteSpace: 'pre-wrap', 
+                  fontFamily: 'inherit', 
+                  margin: 0, 
+                  padding: '1rem',
+                  backgroundColor: '#f5f5f5',
+                  borderRadius: '4px',
+                  minHeight: '100px'
+                }}>
+                  {memoProject.memo || '메모가 없습니다.'}
+                </pre>
+              </div>
+              <div className="form-actions">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowMemoModal(false)
+                    setMemoProject(null)
+                  }}
+                >
+                  닫기
+                </button>
+              </div>
+              </div>
             </div>
           </div>
         )}
@@ -2186,6 +2415,9 @@ function App() {
                   onEdit={handleEditProject}
                   onDelete={handleDeleteProject}
                   onRemoveRecent={handleRemoveRecent}
+                  onViewMemo={handleViewMemo}
+                  onOpenFolder={handleOpenFolder}
+                  onOpenJsonFile={handleOpenJsonFile}
                   isRecent={true}
                   isAllowed={isAllowed}
                 />
@@ -2207,6 +2439,9 @@ function App() {
                   onToggleFavorite={handleToggleFavorite}
                   onEdit={handleEditProject}
                   onDelete={handleDeleteProject}
+                  onViewMemo={handleViewMemo}
+                  onOpenFolder={handleOpenFolder}
+                  onOpenJsonFile={handleOpenJsonFile}
                   isAllowed={isAllowed}
                 />
               ))}
@@ -2273,6 +2508,9 @@ function App() {
                   onToggleFavorite={handleToggleFavorite}
                   onEdit={handleEditProject}
                   onDelete={handleDeleteProject}
+                  onViewMemo={handleViewMemo}
+                  onOpenFolder={handleOpenFolder}
+                  onOpenJsonFile={handleOpenJsonFile}
                   isAllowed={isAllowed}
                   sortMode={sortMode}
                   isDragged={draggedProjectId === project.id}
@@ -2303,7 +2541,10 @@ function ProjectCard({
   onToggleFavorite, 
   onEdit, 
   onDelete, 
-  onRemoveRecent, 
+  onRemoveRecent,
+  onViewMemo,
+  onOpenFolder,
+  onOpenJsonFile,
   isRecent, 
   isAllowed, 
   categories,
@@ -2426,6 +2667,48 @@ function ProjectCard({
           >
             {project.subcategory}
           </span>
+        )}
+        {/* 프로젝트 액션 버튼들 */}
+        {isAllowed && !sortMode && !copyMode && !deleteMode && (
+          <div className="project-actions-bottom">
+            {/* 메모 버튼 - 메모가 있을 때만 표시 */}
+            {project.memo && (
+              <button
+                className="action-btn memo-btn"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onViewMemo?.(project)
+                }}
+                title="메모 보기"
+              >
+                <FaStickyNote />
+              </button>
+            )}
+            {/* 폴더 열기 버튼 - 항상 표시 */}
+            <button
+              className="action-btn folder-btn"
+              onClick={(e) => {
+                e.stopPropagation()
+                onOpenFolder?.(project)
+              }}
+              title="폴더 열기"
+            >
+              <FaFolderOpen />
+            </button>
+            {/* JSON 파일 열기 버튼 - JSON 경로가 있을 때만 표시 */}
+            {project.jsonPath && (
+              <button
+                className="action-btn json-btn"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onOpenJsonFile?.(project)
+                }}
+                title={`${project.jsonPath} 파일 열기`}
+              >
+                <FaFileCode />
+              </button>
+            )}
+          </div>
         )}
       </div>
       {sortMode && isAllowed && (
