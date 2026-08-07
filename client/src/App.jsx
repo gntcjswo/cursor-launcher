@@ -1241,17 +1241,20 @@ function App() {
 
       if (response.ok) {
         setMessage(`${project.name} 폴더가 열렸습니다.`)
+      } else if (response.status === 404) {
+        setMessage(`폴더를 찾을 수 없습니다.\n경로: ${project.path}`)
       } else {
-        throw new Error('API 응답 오류')
+        const data = await response.json().catch(() => ({}))
+        setMessage(`폴더 열기 실패: ${data.error || '알 수 없는 오류'}`)
       }
     } catch (error) {
+      // fetch 자체가 실패한 경우 = 서버 미실행
       console.warn('백엔드 서버에 연결할 수 없습니다.', error)
-      // 경로를 클립보드에 복사
       try {
         await navigator.clipboard.writeText(project.path)
-        setMessage(`프로젝트 경로가 클립보드에 복사되었습니다.\n\n백엔드 서버가 실행 중이 아닙니다. 직접 폴더를 열어주세요.\n경로: ${project.path}`)
+        setMessage(`백엔드 서버가 실행 중이 아닙니다.\n경로가 클립보드에 복사되었습니다.\n${project.path}`)
       } catch (clipboardError) {
-        setMessage(`프로젝트 경로: ${project.path}\n\n백엔드 서버가 실행 중이 아닙니다. 직접 폴더를 열어주세요.`)
+        setMessage(`백엔드 서버가 실행 중이 아닙니다.\n경로: ${project.path}`)
       }
     }
   }
