@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { FaStar, FaRegStar, FaPlus, FaTimes, FaEdit, FaTrash, FaFolder, FaSignInAlt, FaSignOutAlt, FaUserShield, FaCheck, FaChevronDown, FaArrowsAlt, FaGripVertical, FaCopy, FaStickyNote, FaFolderOpen, FaFileCode } from 'react-icons/fa'
+import { FaStar, FaRegStar, FaPlus, FaTimes, FaEdit, FaTrash, FaFolder, FaSignInAlt, FaSignOutAlt, FaUserShield, FaCheck, FaChevronDown, FaArrowsAlt, FaGripVertical, FaCopy, FaStickyNote, FaFolderOpen, FaFileCode, FaCog } from 'react-icons/fa'
 import { signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth'
 import { auth, googleProvider } from './firebase'
 import {
@@ -21,7 +21,8 @@ import {
   removeRecent,
   checkPermission,
   getUserSettings,
-  updateUserSettings
+  updateUserSettings,
+  updateCategorySettings
 } from './firebaseService'
 import './App.css'
 
@@ -45,6 +46,9 @@ function App() {
   const [newProjectColor, setNewProjectColor] = useState('')
   const [newProjectMemo, setNewProjectMemo] = useState('')
   const [newProjectJsonPath, setNewProjectJsonPath] = useState('')
+  const [enableJsonPath, setEnableJsonPath] = useState(false)
+  const [showCategorySettingsModal, setShowCategorySettingsModal] = useState(false)
+  const [selectedCategoryForSettings, setSelectedCategoryForSettings] = useState(null)
   const [newCategoryName, setNewCategoryName] = useState('')
   const [editingCategory, setEditingCategory] = useState(null)
   const [editingCategoryName, setEditingCategoryName] = useState('')
@@ -136,7 +140,7 @@ function App() {
 
   // 모달 상태에 따른 body overflow 제어
   useEffect(() => {
-    const isAnyModalOpen = showAddModal || showEditModal || showCategoryModal || showCopyModal || showConfirmModal || showMemoModal;
+    const isAnyModalOpen = showAddModal || showEditModal || showCategoryModal || showCopyModal || showConfirmModal || showMemoModal || showCategorySettingsModal;
     
     if (isAnyModalOpen) {
       document.body.classList.add('overflow-hidden');
@@ -148,7 +152,7 @@ function App() {
     return () => {
       document.body.classList.remove('overflow-hidden');
     };
-  }, [showAddModal, showEditModal, showCategoryModal, showCopyModal, showConfirmModal, showMemoModal]);
+    }, [showAddModal, showEditModal, showCategoryModal, showCopyModal, showConfirmModal, showMemoModal, showCategorySettingsModal]);
 
   // body 배경색 동적 변경
   useEffect(() => {
@@ -264,6 +268,15 @@ function App() {
       // 최근 목록에 추가
       await addRecent(project.name)
 
+      // 카테고리 설정에서 기본 에디터 가져오기
+      const categoryData = categories.find(c => {
+        const catName = typeof c === 'string' ? c : c.name
+        return catName === project.category
+      })
+      const defaultEditor = (categoryData && typeof categoryData !== 'string' && categoryData.settings) 
+        ? categoryData.settings.defaultEditor || 'cursor'
+        : 'cursor'
+
       // API URL 설정 (환경 변수 또는 기본값)
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001'
       
@@ -277,6 +290,7 @@ function App() {
         body: JSON.stringify({
           projectPath: project.path,
           projectName: project.name,
+          editor: defaultEditor,
         }),
       })
 
@@ -480,7 +494,7 @@ function App() {
         subcategory: newProjectSubcategory || null,
         color: newProjectColor || null,
         memo: newProjectMemo.trim() || null,
-        jsonPath: newProjectJsonPath.trim() || null
+        jsonPath: enableJsonPath ? (newProjectJsonPath.trim() || null) : null
       })
 
       setMessage('프로젝트가 추가되었습니다.')
@@ -491,6 +505,7 @@ function App() {
       setNewProjectColor('')
       setNewProjectMemo('')
       setNewProjectJsonPath('')
+      setEnableJsonPath(false)
       setShowAddModal(false)
       setTimeout(() => {
         setMessage('')
@@ -510,7 +525,8 @@ function App() {
     setNewProjectSubcategory(project.subcategory || '')
     setNewProjectColor(project.color || '')
     setNewProjectMemo(project.memo || '')
-    setNewProjectJsonPath(project.jsonPath || '')
+    setNewProjectJsonPath(project.jsonPath || '.vscode/sftp.json')
+    setEnableJsonPath(!!project.jsonPath)
     setShowEditModal(true)
   }
 
@@ -524,6 +540,7 @@ function App() {
     setNewProjectColor('')
     setNewProjectMemo('')
     setNewProjectJsonPath('')
+    setEnableJsonPath(false)
   }
 
   const handleUpdateProject = async (e) => {
@@ -548,7 +565,7 @@ function App() {
         subcategory: newProjectSubcategory || null,
         color: newProjectColor || null,
         memo: newProjectMemo.trim() || null,
-        jsonPath: newProjectJsonPath.trim() || null
+        jsonPath: enableJsonPath ? (newProjectJsonPath.trim() || null) : null
       })
 
       setMessage('프로젝트가 수정되었습니다.')
@@ -561,6 +578,7 @@ function App() {
       setNewProjectColor('')
       setNewProjectMemo('')
       setNewProjectJsonPath('')
+      setEnableJsonPath(false)
       setTimeout(() => {
         setMessage('')
         loadProjects()
@@ -1263,6 +1281,37 @@ function App() {
     }
   }
 
+  // 카테고리 설정 모달 열기
+  const handleCategorySettings = (categoryName) => {
+    setSelectedCategoryForSettings(categoryName)
+    setShowCategorySettingsModal(true)
+  }
+
+  // 카테고리의 SFTP 플러그인 사용 여부 확인
+  const isSftpEnabledForCategory = (categoryName) => {
+    const categoryData = categories.find(c => {
+      const catName = typeof c === 'string' ? c : c.name
+      return catName === categoryName
+    })
+    return (categoryData && typeof categoryData !== 'string' && categoryData.settings) 
+      ? categoryData.settings.useSftpPlugin || false
+      : false
+  }
+
+  // 카테고리 설정 저장
+  const handleSaveCategorySettings = async (categoryName, settings) => {
+    try {
+      await updateCategorySettings(categoryName, settings)
+      setMessage('카테고리 설정이 저장되었습니다.')
+      setShowCategorySettingsModal(false)
+      await loadProjects()
+      setTimeout(() => setMessage(''), 2000)
+    } catch (error) {
+      console.error('Error saving category settings:', error)
+      setMessage('카테고리 설정 저장에 실패했습니다.')
+    }
+  }
+
   const handleDeleteCategory = (categoryName) => {
     if (!isAllowed) {
       setMessage('권한이 없습니다. 허용된 계정으로 로그인해주세요.')
@@ -1348,6 +1397,11 @@ function App() {
     ? (typeof selectedCategoryData === 'string' ? '#667eea' : (selectedCategoryData.color || '#667eea'))
     : '#667eea'
 
+  // 선택된 카테고리의 기본 에디터 가져오기
+  const selectedCategoryEditor = (selectedCategoryData && typeof selectedCategoryData !== 'string' && selectedCategoryData.settings)
+    ? selectedCategoryData.settings.defaultEditor || 'cursor'
+    : 'cursor'
+
   if (loading) {
   return (
     <div 
@@ -1376,7 +1430,9 @@ function App() {
     >
       <div className="container">
         <div className="header">
-          <h1 className="title">Cursor Launcher</h1>
+          <h1 className="title">
+            {selectedCategoryEditor === 'vscode' ? 'VSCode Launcher' : 'Cursor Launcher'}
+          </h1>
           <div className="header-actions">
             {user ? (
               <>
@@ -1402,6 +1458,7 @@ function App() {
                         setNewProjectColor('')
                         setNewProjectMemo('')
                         setNewProjectJsonPath('')
+                        setEnableJsonPath(false)
                         // 카테고리는 마지막 선택한 것을 유지 (또는 현재 선택된 카테고리)
                         if (!newProjectCategory) {
                           const firstCategory = categories[0]
@@ -1555,6 +1612,7 @@ function App() {
                     setNewProjectColor('')
                     setNewProjectMemo('')
                     setNewProjectJsonPath('')
+                    setEnableJsonPath(false)
                     setShowAddModal(false)
                   }}
                 >
@@ -1589,6 +1647,12 @@ function App() {
                       onChange={(e) => {
                         setNewProjectCategory(e.target.value)
                         setNewProjectSubcategory('') // 카테고리 변경 시 서브카테고리 초기화
+                        
+                        // SFTP 플러그인을 사용하지 않는 카테고리로 변경 시 JSON 경로 초기화
+                        if (!isSftpEnabledForCategory(e.target.value)) {
+                          setEnableJsonPath(false)
+                          setNewProjectJsonPath('')
+                        }
                       }}
                     >
                       {categories.map(cat => {
@@ -1665,16 +1729,36 @@ function App() {
                   />
                   <p className="form-help-text">메모를 입력하면 프로젝트 카드에 메모 보기 버튼이 표시됩니다.</p>
                 </div>
-                <div className="form-group">
-                  <label>JSON 파일 경로 (선택사항)</label>
-                  <input
-                    type="text"
-                    value={newProjectJsonPath}
-                    onChange={(e) => setNewProjectJsonPath(e.target.value)}
-                    placeholder="예: .vscode/sftp.json"
-                  />
-                  <p className="form-help-text">프로젝트 경로를 기준으로 한 상대 경로를 입력하세요. 입력하면 JSON 파일 열기 버튼이 표시됩니다.</p>
-                </div>
+                {/* SFTP 플러그인을 사용하는 카테고리에서만 표시 */}
+                {isSftpEnabledForCategory(newProjectCategory) && (
+                  <div className="form-group">
+                    <label className="checkbox-label">
+                      <input
+                        type="checkbox"
+                        checked={enableJsonPath}
+                        onChange={(e) => {
+                          setEnableJsonPath(e.target.checked)
+                          if (e.target.checked && !newProjectJsonPath) {
+                            setNewProjectJsonPath('.vscode/sftp.json')
+                          }
+                        }}
+                      />
+                      <span>
+                        <FaCheck className="checkbox-icon" />
+                        sftp.json 사용
+                      </span>
+                    </label>
+                    {enableJsonPath && (
+                      <input
+                        type="text"
+                        value={newProjectJsonPath}
+                        onChange={(e) => setNewProjectJsonPath(e.target.value)}
+                        placeholder="예: .vscode/sftp.json"
+                        style={{ marginTop: '0.5rem' }}
+                      />
+                    )}
+                  </div>
+                )}
                 <div className="form-actions">
                   <button 
                     type="button" 
@@ -1685,6 +1769,7 @@ function App() {
                       setNewProjectColor('')
                       setNewProjectMemo('')
                       setNewProjectJsonPath('')
+                      setEnableJsonPath(false)
                       setShowAddModal(false)
                     }}
                   >
@@ -1738,6 +1823,12 @@ function App() {
                       onChange={(e) => {
                         setNewProjectCategory(e.target.value)
                         setNewProjectSubcategory('') // 카테고리 변경 시 서브카테고리 초기화
+                        
+                        // SFTP 플러그인을 사용하지 않는 카테고리로 변경 시 JSON 경로 초기화
+                        if (!isSftpEnabledForCategory(e.target.value)) {
+                          setEnableJsonPath(false)
+                          setNewProjectJsonPath('')
+                        }
                       }}
                     >
                       {categories.map(cat => {
@@ -1827,16 +1918,36 @@ function App() {
                   />
                   <p className="form-help-text">메모를 입력하면 프로젝트 카드에 메모 보기 버튼이 표시됩니다.</p>
                 </div>
-                <div className="form-group">
-                  <label>JSON 파일 경로 (선택사항)</label>
-                  <input
-                    type="text"
-                    value={newProjectJsonPath}
-                    onChange={(e) => setNewProjectJsonPath(e.target.value)}
-                    placeholder="예: .vscode/sftp.json"
-                  />
-                  <p className="form-help-text">프로젝트 경로를 기준으로 한 상대 경로를 입력하세요. 입력하면 JSON 파일 열기 버튼이 표시됩니다.</p>
-                </div>
+                {/* SFTP 플러그인을 사용하는 카테고리에서만 표시 */}
+                {isSftpEnabledForCategory(newProjectCategory) && (
+                  <div className="form-group">
+                    <label className="checkbox-label">
+                      <input
+                        type="checkbox"
+                        checked={enableJsonPath}
+                        onChange={(e) => {
+                          setEnableJsonPath(e.target.checked)
+                          if (e.target.checked && !newProjectJsonPath) {
+                            setNewProjectJsonPath('.vscode/sftp.json')
+                          }
+                        }}
+                      />
+                      <span>
+                        <FaCheck className="checkbox-icon" />
+                        sftp.json 사용
+                      </span>
+                    </label>
+                    {enableJsonPath && (
+                      <input
+                        type="text"
+                        value={newProjectJsonPath}
+                        onChange={(e) => setNewProjectJsonPath(e.target.value)}
+                        placeholder="예: .vscode/sftp.json"
+                        style={{ marginTop: '0.5rem' }}
+                      />
+                    )}
+                  </div>
+                )}
                 <div className="form-actions">
                   <button type="button" onClick={handleCancelEditProject}>
                     취소
@@ -1931,6 +2042,13 @@ function App() {
                             <span>{categoryName}</span>
                           </div>
                           <div className="category-actions">
+                            <button
+                              className="settings-btn"
+                              onClick={() => handleCategorySettings(categoryName)}
+                              title="카테고리 설정"
+                            >
+                              <FaCog />
+                            </button>
                             <button
                               className="edit-btn"
                               onClick={() => handleEditCategory(category)}
@@ -2401,6 +2519,40 @@ function App() {
           </div>
         )}
 
+        {/* 카테고리 설정 모달 */}
+        {showCategorySettingsModal && selectedCategoryForSettings && (
+          <div className="modal-overlay" onClick={() => {
+            setShowCategorySettingsModal(false)
+            setSelectedCategoryForSettings(null)
+          }}>
+            <div className="modal-inner">
+              <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+                <div className="modal-header">
+                  <h2>{selectedCategoryForSettings} - 카테고리 설정</h2>
+                  <button
+                    className="close-btn"
+                    onClick={() => {
+                      setShowCategorySettingsModal(false)
+                      setSelectedCategoryForSettings(null)
+                    }}
+                  >
+                    <FaTimes />
+                  </button>
+                </div>
+                <CategorySettings
+                  categoryName={selectedCategoryForSettings}
+                  categories={categories}
+                  onSave={handleSaveCategorySettings}
+                  onCancel={() => {
+                    setShowCategorySettingsModal(false)
+                    setSelectedCategoryForSettings(null)
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
         {showRecent && recentProjects.length > 0 && (
           <section className="section">
             <h2 className="section-title">Recent</h2>
@@ -2695,19 +2847,29 @@ function ProjectCard({
             >
               <FaFolderOpen />
             </button>
-            {/* JSON 파일 열기 버튼 - JSON 경로가 있을 때만 표시 */}
-            {project.jsonPath && (
-              <button
-                className="action-btn json-btn"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onOpenJsonFile?.(project)
-                }}
-                title={`${project.jsonPath} 파일 열기`}
-              >
-                <FaFileCode />
-              </button>
-            )}
+            {/* JSON 파일 열기 버튼 - JSON 경로가 있고 카테고리에서 SFTP 플러그인을 사용할 때만 표시 */}
+            {project.jsonPath && (() => {
+              const categoryData = categories?.find(c => {
+                const catName = typeof c === 'string' ? c : c.name
+                return catName === project.category
+              })
+              const useSftpPlugin = (categoryData && typeof categoryData !== 'string' && categoryData.settings) 
+                ? categoryData.settings.useSftpPlugin || false
+                : false
+              
+              return useSftpPlugin && (
+                <button
+                  className="action-btn json-btn"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onOpenJsonFile?.(project)
+                  }}
+                  title={`${project.jsonPath} 파일 열기`}
+                >
+                  <FaFileCode />
+                </button>
+              )
+            })()}
           </div>
         )}
       </div>
@@ -2740,6 +2902,76 @@ function ProjectCard({
           </span>
         </label>
       )}
+    </div>
+  )
+}
+
+// 카테고리 설정 컴포넌트
+function CategorySettings({ categoryName, categories, onSave, onCancel }) {
+  const [defaultEditor, setDefaultEditor] = useState('cursor')
+  const [useSftpPlugin, setUseSftpPlugin] = useState(false)
+
+  useEffect(() => {
+    // 카테고리 설정 로드
+    const categoryData = categories.find(c => {
+      const catName = typeof c === 'string' ? c : c.name
+      return catName === categoryName
+    })
+
+    if (categoryData && typeof categoryData !== 'string' && categoryData.settings) {
+      setDefaultEditor(categoryData.settings.defaultEditor || 'cursor')
+      setUseSftpPlugin(categoryData.settings.useSftpPlugin || false)
+    }
+  }, [categoryName, categories])
+
+  const handleSave = () => {
+    const settings = {
+      defaultEditor,
+      useSftpPlugin
+    }
+    onSave(categoryName, settings)
+  }
+
+  return (
+    <div className="category-settings">
+      <div className="form-group">
+        <label>기본 에디터</label>
+        <div className="select-wrapper">
+          <select
+            value={defaultEditor}
+            onChange={(e) => setDefaultEditor(e.target.value)}
+          >
+            <option value="cursor">Cursor</option>
+            <option value="vscode">VS Code</option>
+          </select>
+          <FaChevronDown className="select-arrow" />
+        </div>
+        <p className="form-help-text">프로젝트 열기 시 사용할 기본 에디터를 선택하세요.</p>
+      </div>
+
+      <div className="form-group">
+        <label className="checkbox-label">
+          <input
+            type="checkbox"
+            checked={useSftpPlugin}
+            onChange={(e) => setUseSftpPlugin(e.target.checked)}
+          />
+          <span>
+            <FaCheck className="checkbox-icon" />
+            SFTP 플러그인 (Natizyskunk) 사용
+          </span>
+        </label>
+        <p className="form-help-text">SFTP 관련 기능 사용 시 이 옵션을 활성화하세요.</p>
+      </div>
+
+      <div className="form-actions">
+        <button type="button" onClick={onCancel}>
+          취소
+        </button>
+        <button type="button" onClick={handleSave}>
+          저장
+        </button>
+      </div>
     </div>
   )
 }

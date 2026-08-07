@@ -184,13 +184,14 @@ export const getCategories = async () => {
 				id: doc.id,
 				name: data.name || data.category || doc.id,
 				color: data.color || '#667eea', // 기본 색상
-				subcategories: data.subcategories || [] // 서브카테고리 배열
+				subcategories: data.subcategories || [], // 서브카테고리 배열
+				settings: data.settings || {} // 카테고리 설정
 			}
 		}).filter(cat => cat.name)
 
 		// 기본 카테고리가 없으면 기본값 반환 (생성은 로그인된 사용자가 할 수 있음)
 		if (categories.length === 0) {
-			return [{ name: '기본', color: '#667eea' }] // 생성하지 않고 기본값만 반환
+			return [{ name: '기본', color: '#667eea', settings: {} }] // 생성하지 않고 기본값만 반환
 		}
 
 		return categories
@@ -208,14 +209,14 @@ export const addCategory = async (categoryName, color = '#667eea') => {
 	})
 }
 
-export const updateCategory = async (oldCategoryName, newCategoryName, newColor = null) => {
+export const updateCategory = async (oldCategoryName, newCategoryName, newColor = null, additionalData = {}) => {
 	// 기존 카테고리 문서 찾기
 	const categoriesSnapshot = await getDocs(
 		query(collection(db, CATEGORIES_COLLECTION), where('name', '==', oldCategoryName))
 	)
 
 	// 카테고리명 및 색상 업데이트
-	const updateData = { name: newCategoryName }
+	const updateData = { name: newCategoryName, ...additionalData }
 	if (newColor !== null) {
 		updateData.color = newColor
 	}
@@ -627,6 +628,28 @@ export const updateUserSettings = async (settings) => {
 		await setDoc(userSettingsRef, settingsData, { merge: true })
 	} catch (error) {
 		console.error('Error updating user settings:', error)
+		throw error
+	}
+}
+
+// 카테고리 설정 업데이트 (기존 updateCategory 함수 활용)
+export async function updateCategorySettings(categoryName, settings) {
+	try {
+		// 기존 카테고리 정보 가져오기
+		const categories = await getCategories()
+		const existingCategory = categories.find(c => c.name === categoryName)
+
+		if (!existingCategory) {
+			throw new Error('Category not found')
+		}
+
+		// 기존 updateCategory 함수를 사용하여 설정만 업데이트
+		await updateCategory(categoryName, categoryName, existingCategory.color, { 
+			settings: settings,
+			subcategories: existingCategory.subcategories || []
+		})
+	} catch (error) {
+		console.error('Error updating category settings:', error)
 		throw error
 	}
 }

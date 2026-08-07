@@ -1182,3 +1182,35 @@ textarea::placeholder {
   color: #999;
 }
 
+/* 카테고리 설정 스타일 */
+.settings-btn {
+  background: #f8f9fa;
+  border: 1px solid #6c757d;
+  border-radius: 6px;
+  padding: 0.5rem;
+  cursor: pointer;
+  color: #6c757d;
+  font-size: 0.875rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  margin-right: 0.5rem;
+}
+
+.settings-btn:hover {
+  background: #e9ecef;
+  border-color: #495057;
+  color: #495057;
+}
+
+.category-settings .form-group {
+  margin-bottom: 1.5rem;
+}
+
+.category-settings .form-help-text {
+  margin-top: 0.5rem;
+  font-size: 0.875rem;
+  color: #666;
+}
+

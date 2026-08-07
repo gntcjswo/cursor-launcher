@@ -140,7 +140,7 @@ app.get('/api/projects', async (req, res) => {
 // 프로젝트 열기
 app.post('/api/open', async (req, res) => {
   try {
-    const { projectPath, projectName } = req.body;
+    const { projectPath, projectName, editor = 'cursor' } = req.body;
 
     if (!projectPath) {
       return res.status(400).json({ error: 'Project path is required' });
@@ -160,11 +160,38 @@ app.post('/api/open', async (req, res) => {
       await fs.writeFile(recentFile, recentProjects.join('\n'), 'utf8');
     }
 
-    // Cursor 실행
-    exec(`cursor "${projectPath}"`, (error) => {
+    // 에디터별 실행
+    let command
+    if (editor === 'vscode') {
+      // Cursor가 code 명령어를 덮어쓰기 때문에 VS Code 실행 파일 경로를 직접 사용
+      const vscodePaths = [
+        `"${process.env.LOCALAPPDATA}\\Programs\\Microsoft VS Code\\Code.exe"`,
+        `"C:\\Program Files\\Microsoft VS Code\\Code.exe"`,
+        `"C:\\Program Files (x86)\\Microsoft VS Code\\Code.exe"`,
+      ]
+      // 존재하는 경로 찾기
+      let vscodeExe = null
+      for (const p of vscodePaths) {
+        const cleanPath = p.replace(/"/g, '')
+        if (require('fs').existsSync(cleanPath)) {
+          vscodeExe = p
+          break
+        }
+      }
+      if (vscodeExe) {
+        command = `${vscodeExe} "${projectPath}"`
+      } else {
+        // 경로를 못 찾으면 code 명령어 시도
+        command = `code "${projectPath}"`
+      }
+    } else {
+      command = `cursor "${projectPath}"`
+    }
+
+    exec(command, (error) => {
       if (error) {
-        console.error('Error opening cursor:', error);
-        return res.status(500).json({ error: 'Failed to open cursor' });
+        console.error(`Error opening ${editor}:`, error);
+        return res.status(500).json({ error: `Failed to open ${editor}` });
       }
       res.json({ success: true });
     });
