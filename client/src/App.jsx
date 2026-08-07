@@ -34,7 +34,7 @@ function App() {
   const [loading, setLoading] = useState(true)
   const [message, setMessage] = useState('')
   const [messageVisible, setMessageVisible] = useState(false)
-  const [selectedCategory, setSelectedCategory] = useState(null)
+  const [selectedCategory, setSelectedCategory] = useState(() => localStorage.getItem('selectedCategory') || null)
   const [showAddModal, setShowAddModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [showCategoryModal, setShowCategoryModal] = useState(false)
@@ -242,12 +242,28 @@ function App() {
       setRecent(recentData)
       setFavorites(favoritesData)
       
-      if (!selectedCategory && categoriesData && categoriesData.length > 0) {
-        const firstCategory = categoriesData[0]
-        const firstCategoryName = typeof firstCategory === 'string' ? firstCategory : firstCategory.name
-        setSelectedCategory(firstCategoryName)
-        // 초기 로드 시 첫 번째 카테고리의 모든 서브카테고리와 "서브카테고리 없음"을 기본값으로 선택
-        const subcategories = typeof firstCategory !== 'string' ? (firstCategory.subcategories || []) : []
+      if (categoriesData && categoriesData.length > 0) {
+        const savedCategory = localStorage.getItem('selectedCategory')
+        const savedCategoryExists = savedCategory && categoriesData.some(c => {
+          const catName = typeof c === 'string' ? c : c.name
+          return catName === savedCategory
+        })
+
+        const targetCategoryName = savedCategoryExists
+          ? savedCategory
+          : (typeof categoriesData[0] === 'string' ? categoriesData[0] : categoriesData[0].name)
+
+        const targetCategory = categoriesData.find(c => {
+          const catName = typeof c === 'string' ? c : c.name
+          return catName === targetCategoryName
+        })
+
+        if (!selectedCategory || !savedCategoryExists) {
+          setSelectedCategory(targetCategoryName)
+          localStorage.setItem('selectedCategory', targetCategoryName)
+        }
+
+        const subcategories = targetCategory && typeof targetCategory !== 'string' ? (targetCategory.subcategories || []) : []
         setSelectedSubcategories([...subcategories, null])
       }
       setLoading(false)
@@ -1511,6 +1527,7 @@ function App() {
                 className={`tab ${selectedCategory === categoryName ? 'active' : ''}`}
                 onClick={() => {
                   setSelectedCategory(categoryName)
+                  localStorage.setItem('selectedCategory', categoryName)
                   // 카테고리 변경 시 해당 카테고리의 모든 서브카테고리를 기본값으로 선택
                   const selectedCat = categories.find(c => {
                     const catName = typeof c === 'string' ? c : c.name
