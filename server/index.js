@@ -227,24 +227,13 @@ app.post('/api/open-folder', async (req, res) => {
     }
 
     exec(command, (error) => {
-      if (error) {
+      // Windows에서 explorer.exe는 성공해도 exit code 1을 반환하는 경우가 있어서
+      // ENOENT(파일 없음) 같은 실제 오류만 처리
+      if (error && error.code !== 1) {
         console.error('Error opening folder:', error);
-        // Windows에서 explorer 실패 시 대안 방법 시도
-        if (process.platform === 'win32') {
-          const alternativeCommand = `start "" "${projectPath}"`;
-          exec(alternativeCommand, (altError) => {
-            if (altError) {
-              console.error('Alternative command also failed:', altError);
-              return res.status(500).json({ error: 'Failed to open folder' });
-            }
-            res.json({ success: true });
-          });
-        } else {
-          return res.status(500).json({ error: 'Failed to open folder' });
-        }
-      } else {
-        res.json({ success: true });
+        return res.status(500).json({ error: 'Failed to open folder' });
       }
+      res.json({ success: true });
     });
   } catch (error) {
     console.error('Error opening folder:', error);

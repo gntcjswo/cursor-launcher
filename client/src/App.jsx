@@ -1214,7 +1214,11 @@ function App() {
   }
 
   // 폴더 열기 핸들러
+  const openFolderInProgress = useRef(false)
   const handleOpenFolder = async (project) => {
+    if (openFolderInProgress.current) return
+    openFolderInProgress.current = true
+    setTimeout(() => { openFolderInProgress.current = false }, 1000)
     if (!isAllowed) {
       setMessage('권한이 없습니다. 허용된 계정으로 로그인해주세요.')
       return
