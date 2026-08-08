@@ -597,17 +597,14 @@ export const getUserSettings = async () => {
 		if (userSettingsDoc.exists()) {
 			const data = userSettingsDoc.data()
 			return {
-				showRecent: data.showRecent !== undefined ? data.showRecent : true,
-				showFavorites: data.showFavorites !== undefined ? data.showFavorites : true
+				sectionOptions: data.sectionOptions || {}
 			}
 		} else {
-			// 문서가 없으면 기본값 반환
-			return { showRecent: true, showFavorites: true }
+			return { sectionOptions: {} }
 		}
 	} catch (error) {
 		console.error('Error getting user settings:', error)
-		// 오류 시 기본값 반환
-		return { showRecent: true, showFavorites: true }
+		return { sectionOptions: {} }
 	}
 }
 

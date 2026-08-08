@@ -35,6 +35,9 @@ function App() {
   const [message, setMessage] = useState('')
   const [messageVisible, setMessageVisible] = useState(false)
   const [selectedCategory, setSelectedCategory] = useState(() => localStorage.getItem('selectedCategory') || null)
+  const [sectionOptions, setSectionOptions] = useState({})
+  const showRecent = sectionOptions[selectedCategory]?.showRecent ?? true
+  const showFavorites = sectionOptions[selectedCategory]?.showFavorites ?? true
   const [showAddModal, setShowAddModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [showCategoryModal, setShowCategoryModal] = useState(false)
@@ -60,8 +63,6 @@ function App() {
   const [editingSubcategoryName, setEditingSubcategoryName] = useState('')
   const [user, setUser] = useState(null)
   const [isAllowed, setIsAllowed] = useState(false)
-  const [showRecent, setShowRecent] = useState(true)
-  const [showFavorites, setShowFavorites] = useState(true)
   const [selectedSubcategories, setSelectedSubcategories] = useState([]) // 선택된 서브카테고리 목록
   const [sortMode, setSortMode] = useState(false)
   const [draggedProjectId, setDraggedProjectId] = useState(null)
@@ -147,18 +148,15 @@ function App() {
         // 사용자 설정 불러오기
         const settings = await getUserSettings()
         isInitialLoad.current = true
-        setShowRecent(settings.showRecent)
-        setShowFavorites(settings.showFavorites)
+        setSectionOptions(settings.sectionOptions || {})
         // 설정 로드 후 플래그 리셋
         setTimeout(() => {
           isInitialLoad.current = false
         }, 100)
       } else {
         setIsAllowed(false)
-        // 로그아웃 시 기본값으로 설정
         isInitialLoad.current = true
-        setShowRecent(true)
-        setShowFavorites(true)
+        setSectionOptions({})
         setTimeout(() => {
           isInitialLoad.current = false
         }, 100)
@@ -479,7 +477,7 @@ function App() {
     }
   }
 
-  // showRecent와 showFavorites 변경 시 Firebase에 저장
+  // sectionOptions 변경 시 Firebase에 저장
   useEffect(() => {
     if (isInitialLoad.current || !user) {
       return
@@ -487,7 +485,7 @@ function App() {
     
     const saveSettings = async () => {
       try {
-        await updateUserSettings({ showRecent, showFavorites })
+        await updateUserSettings({ sectionOptions })
       } catch (error) {
         console.error('Error updating user settings:', error)
         setMessage('설정 저장에 실패했습니다: ' + (error.message || error.code))
@@ -495,14 +493,20 @@ function App() {
     }
     
     saveSettings()
-  }, [showRecent, showFavorites, user])
+  }, [sectionOptions, user])
 
   const handleShowRecentChange = (checked) => {
-    setShowRecent(checked)
+    setSectionOptions(prev => ({
+      ...prev,
+      [selectedCategory]: { ...prev[selectedCategory], showRecent: checked }
+    }))
   }
 
   const handleShowFavoritesChange = (checked) => {
-    setShowFavorites(checked)
+    setSectionOptions(prev => ({
+      ...prev,
+      [selectedCategory]: { ...prev[selectedCategory], showFavorites: checked }
+    }))
   }
 
   const handleSubcategoryToggle = (subcategoryName) => {
