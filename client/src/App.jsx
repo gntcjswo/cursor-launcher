@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { FaStar, FaRegStar, FaPlus, FaTimes, FaEdit, FaTrash, FaFolder, FaSignInAlt, FaSignOutAlt, FaUserShield, FaCheck, FaChevronDown, FaArrowsAlt, FaGripVertical, FaCopy, FaStickyNote, FaFolderOpen, FaFileCode, FaCog, FaHistory } from 'react-icons/fa'
+import { FaStar, FaRegStar, FaPlus, FaTimes, FaEdit, FaTrash, FaFolder, FaSignInAlt, FaSignOutAlt, FaUserShield, FaCheck, FaChevronDown, FaArrowsAlt, FaGripVertical, FaCopy, FaStickyNote, FaFolderOpen, FaFileCode, FaCog, FaHistory, FaEye, FaEyeSlash, FaKey, FaClipboard } from 'react-icons/fa'
 import { signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth'
 import { auth, googleProvider } from './firebase'
 import {
@@ -48,6 +48,8 @@ function App() {
   const [newProjectSubcategory, setNewProjectSubcategory] = useState('')
   const [newProjectColor, setNewProjectColor] = useState('')
   const [newProjectMemo, setNewProjectMemo] = useState('')
+  const [newProjectPassword, setNewProjectPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [newProjectJsonPath, setNewProjectJsonPath] = useState('')
   const [enableJsonPath, setEnableJsonPath] = useState(false)
   const [showCategorySettingsModal, setShowCategorySettingsModal] = useState(false)
@@ -562,6 +564,7 @@ function App() {
         subcategory: newProjectSubcategory || null,
         color: newProjectColor || null,
         memo: newProjectMemo.trim() || null,
+        password: newProjectPassword.trim() || null,
         jsonPath: enableJsonPath ? (newProjectJsonPath.trim() || null) : null
       })
 
@@ -595,6 +598,8 @@ function App() {
     setNewProjectSubcategory(project.subcategory || '')
     setNewProjectColor(project.color || '')
     setNewProjectMemo(project.memo || '')
+    setNewProjectPassword(project.password || '')
+    setShowPassword(false)
     setNewProjectJsonPath(project.jsonPath || '.vscode/sftp.json')
     setEnableJsonPath(!!project.jsonPath)
     setShowEditModal(true)
@@ -609,6 +614,8 @@ function App() {
     setNewProjectSubcategory('')
     setNewProjectColor('')
     setNewProjectMemo('')
+    setNewProjectPassword('')
+    setShowPassword(false)
     setNewProjectJsonPath('')
     setEnableJsonPath(false)
   }
@@ -635,6 +642,7 @@ function App() {
         subcategory: newProjectSubcategory || null,
         color: newProjectColor || null,
         memo: newProjectMemo.trim() || null,
+        password: newProjectPassword.trim() || null,
         jsonPath: enableJsonPath ? (newProjectJsonPath.trim() || null) : null
       })
 
@@ -1383,6 +1391,29 @@ function App() {
   }
 
   // 카테고리 설정 모달 열기
+  const handleCopyPassword = async (project) => {
+    if (!project.password) return
+    try {
+      await navigator.clipboard.writeText(project.password)
+      setMessage(`${project.name} 비밀번호가 클립보드에 복사되었습니다.`)
+      setTimeout(() => setMessage(''), 2000)
+    } catch {
+      setMessage('클립보드 복사에 실패했습니다.')
+    }
+  }
+
+  const handleCopyJsonPath = async (project) => {
+    if (!project.jsonPath) return
+    const fullPath = `${project.path}/${project.jsonPath.replace(/^[/\\]/, '')}`
+    try {
+      await navigator.clipboard.writeText(fullPath)
+      setMessage(`${project.jsonPath} 경로가 클립보드에 복사되었습니다.`)
+      setTimeout(() => setMessage(''), 2000)
+    } catch {
+      setMessage('클립보드 복사에 실패했습니다.')
+    }
+  }
+
   const handleCategorySettings = (categoryName) => {
     setSelectedCategoryForSettings(categoryName)
     setShowCategorySettingsModal(true)
@@ -1841,6 +1872,26 @@ function App() {
                   />
                   <p className="form-help-text">메모를 입력하면 프로젝트 카드에 메모 보기 버튼이 표시됩니다.</p>
                 </div>
+                <div className="form-group">
+                  <label>서버 비밀번호 (선택사항)</label>
+                  <div className="password-input-wrap">
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      value={newProjectPassword}
+                      onChange={(e) => setNewProjectPassword(e.target.value)}
+                      placeholder="복사할 텍스트를 입력하세요..."
+                    />
+                    <button
+                      type="button"
+                      className="password-toggle-btn"
+                      onClick={() => setShowPassword(v => !v)}
+                      tabIndex={-1}
+                    >
+                      {showPassword ? <FaEyeSlash /> : <FaEye />}
+                    </button>
+                  </div>
+                  <p className="form-help-text">입력하면 프로젝트 카드에 클립보드 복사 버튼이 표시됩니다.</p>
+                </div>
                 {/* SFTP 플러그인을 사용하는 카테고리에서만 표시 */}
                 {isSftpEnabledForCategory(newProjectCategory) && (
                   <div className="form-group">
@@ -1880,6 +1931,8 @@ function App() {
                       setNewProjectSubcategory('')
                       setNewProjectColor('')
                       setNewProjectMemo('')
+                      setNewProjectPassword('')
+                      setShowPassword(false)
                       setNewProjectJsonPath('')
                       setEnableJsonPath(false)
                       setShowAddModal(false)
@@ -2029,6 +2082,26 @@ function App() {
                     style={{ resize: 'vertical', fontFamily: 'inherit' }}
                   />
                   <p className="form-help-text">메모를 입력하면 프로젝트 카드에 메모 보기 버튼이 표시됩니다.</p>
+                </div>
+                <div className="form-group">
+                  <label>서버 비밀번호 (선택사항)</label>
+                  <div className="password-input-wrap">
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      value={newProjectPassword}
+                      onChange={(e) => setNewProjectPassword(e.target.value)}
+                      placeholder="복사할 텍스트를 입력하세요..."
+                    />
+                    <button
+                      type="button"
+                      className="password-toggle-btn"
+                      onClick={() => setShowPassword(v => !v)}
+                      tabIndex={-1}
+                    >
+                      {showPassword ? <FaEyeSlash /> : <FaEye />}
+                    </button>
+                  </div>
+                  <p className="form-help-text">입력하면 프로젝트 카드에 클립보드 복사 버튼이 표시됩니다.</p>
                 </div>
                 {/* SFTP 플러그인을 사용하는 카테고리에서만 표시 */}
                 {isSftpEnabledForCategory(newProjectCategory) && (
@@ -2733,6 +2806,8 @@ function App() {
                   onViewMemo={handleViewMemo}
                   onOpenFolder={handleOpenFolder}
                   onOpenJsonFile={handleOpenJsonFile}
+                  onCopyPassword={handleCopyPassword}
+                  onCopyJsonPath={handleCopyJsonPath}
                   isRecent={true}
                   isAllowed={isAllowed}
                 />
@@ -2759,6 +2834,8 @@ function App() {
                   onViewMemo={handleViewMemo}
                   onOpenFolder={handleOpenFolder}
                   onOpenJsonFile={handleOpenJsonFile}
+                  onCopyPassword={handleCopyPassword}
+                  onCopyJsonPath={handleCopyJsonPath}
                   isAllowed={isAllowed}
                 />
               ))}
@@ -2828,6 +2905,8 @@ function App() {
                   onViewMemo={handleViewMemo}
                   onOpenFolder={handleOpenFolder}
                   onOpenJsonFile={handleOpenJsonFile}
+                  onCopyPassword={handleCopyPassword}
+                  onCopyJsonPath={handleCopyJsonPath}
                   isAllowed={isAllowed}
                   sortMode={sortMode}
                   isDragged={draggedProjectId === project.id}
@@ -2862,6 +2941,8 @@ function ProjectCard({
   onViewMemo,
   onOpenFolder,
   onOpenJsonFile,
+  onCopyPassword,
+  onCopyJsonPath,
   isRecent, 
   isAllowed, 
   categories,
@@ -2988,53 +3069,79 @@ function ProjectCard({
         {/* 프로젝트 액션 버튼들 */}
         {isAllowed && !sortMode && !copyMode && !deleteMode && (
           <div className="project-actions-bottom">
-            {/* 메모 버튼 - 메모가 있을 때만 표시 */}
-            {project.memo && (
-              <button
-                className="action-btn memo-btn"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onViewMemo?.(project)
-                }}
-                title="메모 보기"
-              >
-                <FaStickyNote />
-              </button>
-            )}
-            {/* 폴더 열기 버튼 - 항상 표시 */}
-            <button
-              className="action-btn folder-btn"
-              onClick={(e) => {
-                e.stopPropagation()
-                onOpenFolder?.(project)
-              }}
-              title="폴더 열기"
-            >
-              <FaFolderOpen />
-            </button>
-            {/* JSON 파일 열기 버튼 - JSON 경로가 있고 카테고리에서 SFTP 플러그인을 사용할 때만 표시 */}
-            {project.jsonPath && (() => {
-              const categoryData = categories?.find(c => {
-                const catName = typeof c === 'string' ? c : c.name
-                return catName === project.category
-              })
-              const useSftpPlugin = (categoryData && typeof categoryData !== 'string' && categoryData.settings) 
-                ? categoryData.settings.useSftpPlugin || false
-                : false
-              
-              return useSftpPlugin && (
+            {/* 왼쪽: 메모, 폴더 열기 */}
+            <div className="actions-left">
+              {project.memo && (
                 <button
-                  className="action-btn json-btn"
+                  className="action-btn memo-btn"
                   onClick={(e) => {
                     e.stopPropagation()
-                    onOpenJsonFile?.(project)
+                    onViewMemo?.(project)
                   }}
-                  title={`${project.jsonPath} 파일 열기`}
+                  title="메모 보기"
                 >
-                  <FaFileCode />
+                  <FaStickyNote />
                 </button>
-              )
-            })()}
+              )}
+              <button
+                className="action-btn folder-btn"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onOpenFolder?.(project)
+                }}
+                title="폴더 열기"
+              >
+                <FaFolderOpen />
+              </button>
+            </div>
+            {/* 오른쪽: 비밀번호 복사, JSON 열기, JSON 경로 복사 */}
+            <div className="actions-right">
+              {project.password && (
+                <button
+                  className="action-btn password-btn"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onCopyPassword?.(project)
+                  }}
+                  title="비밀번호 클립보드 복사"
+                >
+                  <FaKey />
+                </button>
+              )}
+              {project.jsonPath && (() => {
+                const categoryData = categories?.find(c => {
+                  const catName = typeof c === 'string' ? c : c.name
+                  return catName === project.category
+                })
+                const useSftpPlugin = (categoryData && typeof categoryData !== 'string' && categoryData.settings)
+                  ? categoryData.settings.useSftpPlugin || false
+                  : false
+                return useSftpPlugin && (
+                  <>
+                    <button
+                      className="action-btn json-btn"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onOpenJsonFile?.(project)
+                      }}
+                      title={`${project.jsonPath} 파일 열기`}
+                    >
+                      <FaFileCode />
+                    </button>
+                    <button
+                      className="action-btn json-copy-btn"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onCopyJsonPath?.(project)
+                      }}
+                      title={`${project.jsonPath} 경로 복사`}
+                    >
+                      <FaClipboard />
+                    </button>
+                  </>
+                )
+              })()}
+            </div>
           </div>
         )}
       </div>
