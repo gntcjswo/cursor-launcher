@@ -99,6 +99,7 @@ function App() {
     const newLog = {
       id: Date.now(),
       type, // 'success' | 'error' | 'info'
+      category: selectedCategory || '(전체)',
       message,
       timestamp: new Date().toLocaleString('ko-KR', {
         year: 'numeric',
@@ -2673,6 +2674,7 @@ function App() {
                     logs.map(log => (
                       <div key={log.id} className={`log-item log-item--${log.type}`}>
                         <span className="log-timestamp">{log.timestamp}</span>
+                        <span className="log-category">[{log.category || '(전체)'}]</span>
                         <span className="log-message">{log.message}</span>
                       </div>
                     ))
