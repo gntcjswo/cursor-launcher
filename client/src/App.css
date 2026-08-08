@@ -1315,13 +1315,30 @@ textarea::placeholder {
 
 .log-item {
   display: flex;
-  gap: 10px;
   flex-direction: column;
-  align-items: flex-start;
+  gap: 3px;
   padding: 0.45rem 0.6rem;
   font-size: 0.82rem;
   border-left: 3px solid transparent;
   background: #f8f9fa;
+}
+
+.log-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.log-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.log-toast {
+  color: #6c757d;
+  font-size: 0.78rem;
+  font-style: italic;
 }
 
 .log-item--success {

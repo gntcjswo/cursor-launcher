@@ -95,12 +95,13 @@ function App() {
   const lastDragTargetRef = useRef({ projectId: null, insertPosition: null })
 
   // 로그 추가 함수
-  const addLog = (type, message) => {
+  const addLog = (type, message, toast = null) => {
     const newLog = {
       id: Date.now(),
       type, // 'success' | 'error' | 'info'
       category: selectedCategory || '(전체)',
       message,
+      toast,
       timestamp: new Date().toLocaleString('ko-KR', {
         year: 'numeric',
         month: '2-digit',
@@ -341,34 +342,39 @@ function App() {
       })
 
       if (response.ok) {
-        setMessage(`${project.name} 프로젝트를 열었습니다.`)
-        addLog('success', `프로젝트 열기: ${project.name} (${defaultEditor}, ${project.path})`)
+        const toast = `${project.name} 프로젝트를 열었습니다.`
+        setMessage(toast)
+        addLog('success', `프로젝트 열기: ${project.name} (${defaultEditor}, ${project.path})`, toast)
         setTimeout(() => {
           setMessage('')
           loadProjects()
         }, 1000)
           return
       } else if (response.status === 404) {
-        addLog('error', `프로젝트 열기 실패 (경로 없음): ${project.name} (${project.path})`)
-        setMessage(`경로를 찾을 수 없습니다.\n경로: ${project.path}`)
+        const toast = `경로를 찾을 수 없습니다.\n경로: ${project.path}`
+        addLog('error', `프로젝트 열기 실패 (경로 없음): ${project.name} (${project.path})`, toast)
+        setMessage(toast)
         return
       } else {
         const data = await response.json().catch(() => ({}))
-        addLog('error', `프로젝트 열기 실패: ${project.name} - ${data.error || '알 수 없는 오류'}`)
-        setMessage(`프로젝트 열기 실패: ${data.error || '알 수 없는 오류'}`)
+        const toast = `프로젝트 열기 실패: ${data.error || '알 수 없는 오류'}`
+        addLog('error', `프로젝트 열기 실패: ${project.name} - ${data.error || '알 수 없는 오류'}`, toast)
+        setMessage(toast)
         return
       }
       } catch (apiError) {
         // fetch 자체가 실패한 경우 = 서버 미실행
         console.warn('백엔드 서버에 연결할 수 없습니다. 경로를 클립보드에 복사합니다.', apiError)
-        addLog('error', `프로젝트 열기 실패 (서버 미실행): ${project.name} (${project.path})`)
         // 경로를 클립보드에 복사
         try {
           await navigator.clipboard.writeText(project.path)
-          setMessage(`${project.name} 프로젝트 경로가 클립보드에 복사되었습니다.\n\n백엔드 서버가 실행 중이 아닙니다. Cursor에서 직접 열어주세요.\n경로: ${project.path}`)
+          const toast = `${project.name} 프로젝트 경로가 클립보드에 복사되었습니다.\n백엔드 서버가 실행 중이 아닙니다. Cursor에서 직접 열어주세요.\n경로: ${project.path}`
+          addLog('error', `프로젝트 열기 실패 (서버 미실행): ${project.name} (${project.path})`, toast)
+          setMessage(toast)
         } catch (clipboardError) {
-          // 클립보드 복사 실패 시 경로를 표시
-          setMessage(`${project.name} 프로젝트 경로: ${project.path}\n\n백엔드 서버가 실행 중이 아닙니다. Cursor에서 직접 열어주세요.`)
+          const toast = `${project.name} 프로젝트 경로: ${project.path}\n백엔드 서버가 실행 중이 아닙니다. Cursor에서 직접 열어주세요.`
+          addLog('error', `프로젝트 열기 실패 (서버 미실행): ${project.name} (${project.path})`, toast)
+          setMessage(toast)
         }
         setTimeout(() => {
           setMessage('')
@@ -377,8 +383,9 @@ function App() {
       }
     } catch (error) {
       console.error('Error opening project:', error)
-      addLog('error', `프로젝트 열기 오류: ${project.name} - ${error.message}`)
-      setMessage(`프로젝트를 여는데 실패했습니다: ${error.message}`)
+      const toast = `프로젝트를 여는데 실패했습니다: ${error.message}`
+      addLog('error', `프로젝트 열기 오류: ${project.name} - ${error.message}`, toast)
+      setMessage(toast)
     }
   }
 
@@ -558,7 +565,7 @@ function App() {
         jsonPath: enableJsonPath ? (newProjectJsonPath.trim() || null) : null
       })
 
-      addLog('success', `프로젝트 추가: ${newProjectName.trim()} (카테고리: ${newProjectCategory}, 경로: ${newProjectPath.trim()})`)
+      addLog('success', `프로젝트 추가: ${newProjectName.trim()} (카테고리: ${newProjectCategory}, 경로: ${newProjectPath.trim()})`, '프로젝트가 추가되었습니다.')
       setMessage('프로젝트가 추가되었습니다.')
       // 카테고리는 유지하고 프로젝트명, 경로, 서브카테고리, 색상만 비우기
       setNewProjectName('')
@@ -575,7 +582,7 @@ function App() {
       }, 1000)
     } catch (error) {
       console.error('Error adding project:', error)
-      addLog('error', `프로젝트 추가 실패: ${newProjectName.trim()} - ${error.message}`)
+      addLog('error', `프로젝트 추가 실패: ${newProjectName.trim()} - ${error.message}`, '프로젝트 추가에 실패했습니다.')
       setMessage('프로젝트 추가에 실패했습니다.')
     }
   }
@@ -631,7 +638,7 @@ function App() {
         jsonPath: enableJsonPath ? (newProjectJsonPath.trim() || null) : null
       })
 
-      addLog('success', `프로젝트 수정: ${newProjectName.trim()} (카테고리: ${newProjectCategory})`)
+      addLog('success', `프로젝트 수정: ${newProjectName.trim()} (카테고리: ${newProjectCategory})`, '프로젝트가 수정되었습니다.')
       setMessage('프로젝트가 수정되었습니다.')
       setShowEditModal(false)
       setEditingProject(null)
@@ -649,7 +656,7 @@ function App() {
       }, 1000)
     } catch (error) {
       console.error('Error updating project:', error)
-      addLog('error', `프로젝트 수정 실패: ${newProjectName.trim()} - ${error.message}`)
+      addLog('error', `프로젝트 수정 실패: ${newProjectName.trim()} - ${error.message}`, '프로젝트 수정에 실패했습니다.')
       setMessage('프로젝트 수정에 실패했습니다.')
     }
   }
@@ -666,7 +673,7 @@ function App() {
     try {
       // 프로젝트 삭제 (isFavorite, isRecent 정보도 함께 삭제됨)
       await deleteProject(project.id)
-      addLog('info', `프로젝트 삭제: ${project.name} (경로: ${project.path})`)
+      addLog('info', `프로젝트 삭제: ${project.name} (경로: ${project.path})`, '프로젝트가 삭제되었습니다.')
       setMessage('프로젝트가 삭제되었습니다.')
       setTimeout(() => {
         setMessage('')
@@ -674,7 +681,7 @@ function App() {
       }, 1000)
     } catch (error) {
       console.error('Error deleting project:', error)
-      addLog('error', `프로젝트 삭제 실패: ${project.name} - ${error.message}`)
+      addLog('error', `프로젝트 삭제 실패: ${project.name} - ${error.message}`, '프로젝트 삭제에 실패했습니다.')
       setMessage('프로젝트 삭제에 실패했습니다.')
     }
       }
@@ -706,12 +713,12 @@ function App() {
       setCategories(updatedCategories)
       setNewCategoryName('')
       setShowCategoryModal(false)
-      addLog('success', `카테고리 추가: ${newCategoryName.trim()}`)
+      addLog('success', `카테고리 추가: ${newCategoryName.trim()}`, '카테고리가 추가되었습니다.')
       setMessage('카테고리가 추가되었습니다.')
       setTimeout(() => setMessage(''), 2000)
     } catch (error) {
       console.error('Error adding category:', error)
-      addLog('error', `카테고리 추가 실패: ${newCategoryName.trim()} - ${error.message}`)
+      addLog('error', `카테고리 추가 실패: ${newCategoryName.trim()} - ${error.message}`, '카테고리 추가에 실패했습니다.')
       setMessage('카테고리 추가에 실패했습니다.')
     }
   }
@@ -744,7 +751,7 @@ function App() {
     }
     try {
       await updateCategory(editingCategory, editingCategoryName.trim(), editingCategoryColor)
-      addLog('success', `카테고리 수정: ${editingCategory} → ${editingCategoryName.trim()}`)
+      addLog('success', `카테고리 수정: ${editingCategory} → ${editingCategoryName.trim()}`, '카테고리가 수정되었습니다.')
       setMessage('카테고리가 수정되었습니다.')
       setEditingCategory(null)
       setEditingCategoryName('')
@@ -752,7 +759,7 @@ function App() {
       loadProjects()
     } catch (error) {
       console.error('Error updating category:', error)
-      addLog('error', `카테고리 수정 실패: ${editingCategory} - ${error.message}`)
+      addLog('error', `카테고리 수정 실패: ${editingCategory} - ${error.message}`, '카테고리 수정에 실패했습니다.')
       setMessage('카테고리 수정에 실패했습니다.')
     }
   }
@@ -1295,25 +1302,31 @@ function App() {
       })
 
       if (response.ok) {
-        addLog('success', `폴더 열기: ${project.name} (${project.path})`)
-        setMessage(`${project.name} 폴더가 열렸습니다.`)
+        const toast = `${project.name} 폴더가 열렸습니다.`
+        addLog('success', `폴더 열기: ${project.name} (${project.path})`, toast)
+        setMessage(toast)
       } else if (response.status === 404) {
-        addLog('error', `폴더 열기 실패 (경로 없음): ${project.name} (${project.path})`)
-        setMessage(`폴더를 찾을 수 없습니다.\n경로: ${project.path}`)
+        const toast = `폴더를 찾을 수 없습니다.\n경로: ${project.path}`
+        addLog('error', `폴더 열기 실패 (경로 없음): ${project.name} (${project.path})`, toast)
+        setMessage(toast)
       } else {
         const data = await response.json().catch(() => ({}))
-        addLog('error', `폴더 열기 실패: ${project.name} - ${data.error || '알 수 없는 오류'}`)
-        setMessage(`폴더 열기 실패: ${data.error || '알 수 없는 오류'}`)
+        const toast = `폴더 열기 실패: ${data.error || '알 수 없는 오류'}`
+        addLog('error', `폴더 열기 실패: ${project.name} - ${data.error || '알 수 없는 오류'}`, toast)
+        setMessage(toast)
       }
     } catch (error) {
       // fetch 자체가 실패한 경우 = 서버 미실행
       console.warn('백엔드 서버에 연결할 수 없습니다.', error)
-      addLog('error', `폴더 열기 실패 (서버 미실행): ${project.name} (${project.path})`)
       try {
         await navigator.clipboard.writeText(project.path)
-        setMessage(`백엔드 서버가 실행 중이 아닙니다.\n경로가 클립보드에 복사되었습니다.\n${project.path}`)
+        const toast = `백엔드 서버가 실행 중이 아닙니다.\n경로가 클립보드에 복사되었습니다.\n${project.path}`
+        addLog('error', `폴더 열기 실패 (서버 미실행): ${project.name} (${project.path})`, toast)
+        setMessage(toast)
       } catch (clipboardError) {
-        setMessage(`백엔드 서버가 실행 중이 아닙니다.\n경로: ${project.path}`)
+        const toast = `백엔드 서버가 실행 중이 아닙니다.\n경로: ${project.path}`
+        addLog('error', `폴더 열기 실패 (서버 미실행): ${project.name} (${project.path})`, toast)
+        setMessage(toast)
       }
     }
   }
@@ -1347,20 +1360,24 @@ function App() {
       })
 
       if (response.ok) {
-        addLog('success', `JSON 파일 열기: ${project.name} (${project.jsonPath})`)
-        setMessage(`${project.jsonPath} 파일이 열렸습니다.`)
+        const toast = `${project.jsonPath} 파일이 열렸습니다.`
+        addLog('success', `JSON 파일 열기: ${project.name} (${project.jsonPath})`, toast)
+        setMessage(toast)
       } else {
         throw new Error('API 응답 오류')
       }
     } catch (error) {
       console.warn('백엔드 서버에 연결할 수 없습니다.', error)
       const fullPath = `${project.path}/${project.jsonPath.replace(/^[\/\\]/, '')}`
-      addLog('error', `JSON 파일 열기 실패 (서버 미실행): ${project.name} (${fullPath})`)
       try {
         await navigator.clipboard.writeText(fullPath)
-        setMessage(`파일 경로가 클립보드에 복사되었습니다.\n\n백엔드 서버가 실행 중이 아닙니다. 직접 파일을 열어주세요.\n경로: ${fullPath}`)
+        const toast = `파일 경로가 클립보드에 복사되었습니다.\n백엔드 서버가 실행 중이 아닙니다. 직접 파일을 열어주세요.\n경로: ${fullPath}`
+        addLog('error', `JSON 파일 열기 실패 (서버 미실행): ${project.name} (${fullPath})`, toast)
+        setMessage(toast)
       } catch (clipboardError) {
-        setMessage(`파일 경로: ${fullPath}\n\n백엔드 서버가 실행 중이 아닙니다. 직접 파일을 열어주세요.`)
+        const toast = `파일 경로: ${fullPath}\n백엔드 서버가 실행 중이 아닙니다. 직접 파일을 열어주세요.`
+        addLog('error', `JSON 파일 열기 실패 (서버 미실행): ${project.name} (${fullPath})`, toast)
+        setMessage(toast)
       }
     }
   }
@@ -1386,14 +1403,14 @@ function App() {
   const handleSaveCategorySettings = async (categoryName, settings) => {
     try {
       await updateCategorySettings(categoryName, settings)
-      addLog('success', `카테고리 설정 저장: ${categoryName} (에디터: ${settings.defaultEditor || 'cursor'}, SFTP: ${settings.useSftpPlugin ? '사용' : '미사용'})`)
+      addLog('success', `카테고리 설정 저장: ${categoryName} (에디터: ${settings.defaultEditor || 'cursor'}, SFTP: ${settings.useSftpPlugin ? '사용' : '미사용'})`, '카테고리 설정이 저장되었습니다.')
       setMessage('카테고리 설정이 저장되었습니다.')
       setShowCategorySettingsModal(false)
       await loadProjects()
       setTimeout(() => setMessage(''), 2000)
     } catch (error) {
       console.error('Error saving category settings:', error)
-      addLog('error', `카테고리 설정 저장 실패: ${categoryName} - ${error.message}`)
+      addLog('error', `카테고리 설정 저장 실패: ${categoryName} - ${error.message}`, '카테고리 설정 저장에 실패했습니다.')
       setMessage('카테고리 설정 저장에 실패했습니다.')
     }
   }
@@ -1425,7 +1442,7 @@ function App() {
         setSelectedCategory(updatedCategories[0] || null)
       }
       
-      addLog('info', `카테고리 삭제: ${categoryName}`)
+      addLog('info', `카테고리 삭제: ${categoryName}`, '카테고리가 삭제되었습니다.')
       setMessage('카테고리가 삭제되었습니다.')
       setTimeout(() => {
         setMessage('')
@@ -1433,7 +1450,7 @@ function App() {
       }, 1000)
     } catch (error) {
       console.error('Error deleting category:', error)
-      addLog('error', `카테고리 삭제 실패: ${categoryName} - ${error.message}`)
+      addLog('error', `카테고리 삭제 실패: ${categoryName} - ${error.message}`, '카테고리 삭제에 실패했습니다.')
       setMessage('카테고리 삭제에 실패했습니다.')
     }
       }
@@ -2680,9 +2697,16 @@ function App() {
                   ) : (
                     logs.map(log => (
                       <div key={log.id} className={`log-item log-item--${log.type}`}>
-                        <span className="log-timestamp">{log.timestamp}</span>
-                        <span className="log-category">[{log.category || '(전체)'}]</span>
-                        <span className="log-message">{log.message}</span>
+                        <div className="log-meta">
+                          <span className="log-timestamp">{log.timestamp}</span>
+                          <span className="log-category">[{log.category || '(전체)'}]</span>
+                        </div>
+                        <div className="log-body">
+                          <span className="log-message">{log.message}</span>
+                          {log.toast && (
+                            <span className="log-toast">메시지: {log.toast}</span>
+                          )}
+                        </div>
                       </div>
                     ))
                   )}
