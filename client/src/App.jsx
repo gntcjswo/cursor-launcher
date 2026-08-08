@@ -1572,12 +1572,10 @@ function App() {
                         setNewProjectMemo('')
                         setNewProjectJsonPath('')
                         setEnableJsonPath(false)
-                        // 카테고리는 마지막 선택한 것을 유지 (또는 현재 선택된 카테고리)
-                        if (!newProjectCategory) {
-                          const firstCategory = categories[0]
-                          const firstCategoryName = typeof firstCategory === 'string' ? firstCategory : firstCategory?.name
-                          setNewProjectCategory(selectedCategory || firstCategoryName || '')
-                        }
+                        // 항상 현재 선택된 카테고리로 설정
+                        const firstCategory = categories[0]
+                        const firstCategoryName = typeof firstCategory === 'string' ? firstCategory : firstCategory?.name
+                        setNewProjectCategory(selectedCategory || firstCategoryName || '')
                         setShowAddModal(true)
                       }}
                       title="프로젝트 추가"
