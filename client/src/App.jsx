@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { FaStar, FaRegStar, FaPlus, FaTimes, FaEdit, FaTrash, FaFolder, FaSignInAlt, FaSignOutAlt, FaUserShield, FaCheck, FaChevronDown, FaArrowsAlt, FaGripVertical, FaCopy, FaStickyNote, FaFolderOpen, FaFileCode, FaCog } from 'react-icons/fa'
+import { FaStar, FaRegStar, FaPlus, FaTimes, FaEdit, FaTrash, FaFolder, FaSignInAlt, FaSignOutAlt, FaUserShield, FaCheck, FaChevronDown, FaArrowsAlt, FaGripVertical, FaCopy, FaStickyNote, FaFolderOpen, FaFileCode, FaCog, FaHistory } from 'react-icons/fa'
 import { signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth'
 import { auth, googleProvider } from './firebase'
 import {
@@ -80,10 +80,41 @@ function App() {
   const [confirmMessage, setConfirmMessage] = useState('')
   const [showMemoModal, setShowMemoModal] = useState(false)
   const [memoProject, setMemoProject] = useState(null)
+  const [showLogModal, setShowLogModal] = useState(false)
+  const [logs, setLogs] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('appLogs') || '[]')
+    } catch {
+      return []
+    }
+  })
   const confirmCallbackRef = useRef(null)
   const isInitialLoad = useRef(true)
   const dragTimerRef = useRef(null)
   const lastDragTargetRef = useRef({ projectId: null, insertPosition: null })
+
+  // 로그 추가 함수
+  const addLog = (type, message) => {
+    const newLog = {
+      id: Date.now(),
+      type, // 'success' | 'error' | 'info'
+      message,
+      timestamp: new Date().toLocaleString('ko-KR', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+      })
+    }
+    setLogs(prev => {
+      const updated = [newLog, ...prev].slice(0, 200) // 최대 200개 유지
+      localStorage.setItem('appLogs', JSON.stringify(updated))
+      return updated
+    })
+  }
 
   // 이메일 마스킹 함수
   const maskEmail = (email) => {
@@ -140,7 +171,7 @@ function App() {
 
   // 모달 상태에 따른 body overflow 제어
   useEffect(() => {
-    const isAnyModalOpen = showAddModal || showEditModal || showCategoryModal || showCopyModal || showConfirmModal || showMemoModal || showCategorySettingsModal;
+    const isAnyModalOpen = showAddModal || showEditModal || showCategoryModal || showCopyModal || showConfirmModal || showMemoModal || showCategorySettingsModal || showLogModal;
     
     if (isAnyModalOpen) {
       document.body.classList.add('overflow-hidden');
@@ -312,6 +343,7 @@ function App() {
 
       if (response.ok) {
         setMessage(`${project.name} 프로젝트를 열었습니다.`)
+        addLog('success', `프로젝트 열기: ${project.name} (${defaultEditor}, ${project.path})`)
         setTimeout(() => {
           setMessage('')
           loadProjects()
@@ -323,7 +355,7 @@ function App() {
       } catch (apiError) {
         // API 호출 실패 시 (백엔드 서버가 실행되지 않은 경우)
         console.warn('백엔드 서버에 연결할 수 없습니다. 경로를 클립보드에 복사합니다.', apiError)
-        
+        addLog('error', `프로젝트 열기 실패 (서버 미실행): ${project.name} (${project.path})`)
         // 경로를 클립보드에 복사
         try {
           await navigator.clipboard.writeText(project.path)
@@ -339,6 +371,7 @@ function App() {
       }
     } catch (error) {
       console.error('Error opening project:', error)
+      addLog('error', `프로젝트 열기 오류: ${project.name} - ${error.message}`)
       setMessage(`프로젝트를 여는데 실패했습니다: ${error.message}`)
     }
   }
@@ -513,6 +546,7 @@ function App() {
         jsonPath: enableJsonPath ? (newProjectJsonPath.trim() || null) : null
       })
 
+      addLog('success', `프로젝트 추가: ${newProjectName.trim()} (카테고리: ${newProjectCategory}, 경로: ${newProjectPath.trim()})`)
       setMessage('프로젝트가 추가되었습니다.')
       // 카테고리는 유지하고 프로젝트명, 경로, 서브카테고리, 색상만 비우기
       setNewProjectName('')
@@ -529,6 +563,7 @@ function App() {
       }, 1000)
     } catch (error) {
       console.error('Error adding project:', error)
+      addLog('error', `프로젝트 추가 실패: ${newProjectName.trim()} - ${error.message}`)
       setMessage('프로젝트 추가에 실패했습니다.')
     }
   }
@@ -584,6 +619,7 @@ function App() {
         jsonPath: enableJsonPath ? (newProjectJsonPath.trim() || null) : null
       })
 
+      addLog('success', `프로젝트 수정: ${newProjectName.trim()} (카테고리: ${newProjectCategory})`)
       setMessage('프로젝트가 수정되었습니다.')
       setShowEditModal(false)
       setEditingProject(null)
@@ -601,6 +637,7 @@ function App() {
       }, 1000)
     } catch (error) {
       console.error('Error updating project:', error)
+      addLog('error', `프로젝트 수정 실패: ${newProjectName.trim()} - ${error.message}`)
       setMessage('프로젝트 수정에 실패했습니다.')
     }
   }
@@ -617,6 +654,7 @@ function App() {
     try {
       // 프로젝트 삭제 (isFavorite, isRecent 정보도 함께 삭제됨)
       await deleteProject(project.id)
+      addLog('info', `프로젝트 삭제: ${project.name} (경로: ${project.path})`)
       setMessage('프로젝트가 삭제되었습니다.')
       setTimeout(() => {
         setMessage('')
@@ -624,6 +662,7 @@ function App() {
       }, 1000)
     } catch (error) {
       console.error('Error deleting project:', error)
+      addLog('error', `프로젝트 삭제 실패: ${project.name} - ${error.message}`)
       setMessage('프로젝트 삭제에 실패했습니다.')
     }
       }
@@ -655,10 +694,12 @@ function App() {
       setCategories(updatedCategories)
       setNewCategoryName('')
       setShowCategoryModal(false)
+      addLog('success', `카테고리 추가: ${newCategoryName.trim()}`)
       setMessage('카테고리가 추가되었습니다.')
       setTimeout(() => setMessage(''), 2000)
     } catch (error) {
       console.error('Error adding category:', error)
+      addLog('error', `카테고리 추가 실패: ${newCategoryName.trim()} - ${error.message}`)
       setMessage('카테고리 추가에 실패했습니다.')
     }
   }
@@ -691,6 +732,7 @@ function App() {
     }
     try {
       await updateCategory(editingCategory, editingCategoryName.trim(), editingCategoryColor)
+      addLog('success', `카테고리 수정: ${editingCategory} → ${editingCategoryName.trim()}`)
       setMessage('카테고리가 수정되었습니다.')
       setEditingCategory(null)
       setEditingCategoryName('')
@@ -698,6 +740,7 @@ function App() {
       loadProjects()
     } catch (error) {
       console.error('Error updating category:', error)
+      addLog('error', `카테고리 수정 실패: ${editingCategory} - ${error.message}`)
       setMessage('카테고리 수정에 실패했습니다.')
     }
   }
@@ -1240,16 +1283,20 @@ function App() {
       })
 
       if (response.ok) {
+        addLog('success', `폴더 열기: ${project.name} (${project.path})`)
         setMessage(`${project.name} 폴더가 열렸습니다.`)
       } else if (response.status === 404) {
+        addLog('error', `폴더 열기 실패 (경로 없음): ${project.name} (${project.path})`)
         setMessage(`폴더를 찾을 수 없습니다.\n경로: ${project.path}`)
       } else {
         const data = await response.json().catch(() => ({}))
+        addLog('error', `폴더 열기 실패: ${project.name} - ${data.error || '알 수 없는 오류'}`)
         setMessage(`폴더 열기 실패: ${data.error || '알 수 없는 오류'}`)
       }
     } catch (error) {
       // fetch 자체가 실패한 경우 = 서버 미실행
       console.warn('백엔드 서버에 연결할 수 없습니다.', error)
+      addLog('error', `폴더 열기 실패 (서버 미실행): ${project.name} (${project.path})`)
       try {
         await navigator.clipboard.writeText(project.path)
         setMessage(`백엔드 서버가 실행 중이 아닙니다.\n경로가 클립보드에 복사되었습니다.\n${project.path}`)
@@ -1288,6 +1335,7 @@ function App() {
       })
 
       if (response.ok) {
+        addLog('success', `JSON 파일 열기: ${project.name} (${project.jsonPath})`)
         setMessage(`${project.jsonPath} 파일이 열렸습니다.`)
       } else {
         throw new Error('API 응답 오류')
@@ -1295,6 +1343,7 @@ function App() {
     } catch (error) {
       console.warn('백엔드 서버에 연결할 수 없습니다.', error)
       const fullPath = `${project.path}/${project.jsonPath.replace(/^[\/\\]/, '')}`
+      addLog('error', `JSON 파일 열기 실패 (서버 미실행): ${project.name} (${fullPath})`)
       try {
         await navigator.clipboard.writeText(fullPath)
         setMessage(`파일 경로가 클립보드에 복사되었습니다.\n\n백엔드 서버가 실행 중이 아닙니다. 직접 파일을 열어주세요.\n경로: ${fullPath}`)
@@ -1325,12 +1374,14 @@ function App() {
   const handleSaveCategorySettings = async (categoryName, settings) => {
     try {
       await updateCategorySettings(categoryName, settings)
+      addLog('success', `카테고리 설정 저장: ${categoryName} (에디터: ${settings.defaultEditor || 'cursor'}, SFTP: ${settings.useSftpPlugin ? '사용' : '미사용'})`)
       setMessage('카테고리 설정이 저장되었습니다.')
       setShowCategorySettingsModal(false)
       await loadProjects()
       setTimeout(() => setMessage(''), 2000)
     } catch (error) {
       console.error('Error saving category settings:', error)
+      addLog('error', `카테고리 설정 저장 실패: ${categoryName} - ${error.message}`)
       setMessage('카테고리 설정 저장에 실패했습니다.')
     }
   }
@@ -1362,6 +1413,7 @@ function App() {
         setSelectedCategory(updatedCategories[0] || null)
       }
       
+      addLog('info', `카테고리 삭제: ${categoryName}`)
       setMessage('카테고리가 삭제되었습니다.')
       setTimeout(() => {
         setMessage('')
@@ -1369,6 +1421,7 @@ function App() {
       }, 1000)
     } catch (error) {
       console.error('Error deleting category:', error)
+      addLog('error', `카테고리 삭제 실패: ${categoryName} - ${error.message}`)
       setMessage('카테고리 삭제에 실패했습니다.')
     }
       }
@@ -1462,6 +1515,14 @@ function App() {
                 <span className="user-info">
                   {maskEmail(user.email)} {isAllowed && <FaUserShield className="allowed-badge" title="권한 있음" />}
                 </span>
+                <button
+                  className="log-btn"
+                  onClick={() => setShowLogModal(true)}
+                  title="실행 로그 보기"
+                >
+                  <FaHistory />
+                  {logs.length > 0 && <span className="log-badge">{logs.length > 99 ? '99+' : logs.length}</span>}
+                </button>
                 <button 
                   className="logout-btn"
                   onClick={handleLogout}
@@ -2577,9 +2638,52 @@ function App() {
           </div>
         )}
 
+        {showLogModal && (
+          <div className="modal-overlay" onClick={() => setShowLogModal(false)}>
+            <div className="modal-inner" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-content log-modal">
+                <div className="modal-header">
+                  <h2><FaHistory style={{ marginRight: '8px', verticalAlign: 'middle' }} />실행 로그</h2>
+                  <button className="close-btn" onClick={() => setShowLogModal(false)}>
+                    <FaTimes />
+                  </button>
+                </div>
+                <div className="log-modal-toolbar">
+                  <span className="log-count">총 {logs.length}개</span>
+                  <button
+                    className="log-clear-btn"
+                    onClick={() => {
+                      if (window.confirm('모든 로그를 삭제하시겠습니까?')) {
+                        setLogs([])
+                        localStorage.removeItem('appLogs')
+                      }
+                    }}
+                  >
+                    전체 삭제
+                  </button>
+                </div>
+                <div className="log-list">
+                  {logs.length === 0 ? (
+                    <div className="log-empty">기록된 로그가 없습니다.</div>
+                  ) : (
+                    logs.map(log => (
+                      <div key={log.id} className={`log-item log-item--${log.type}`}>
+                        <span className="log-timestamp">{log.timestamp}</span>
+                        <span className="log-message">{log.message}</span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {showRecent && recentProjects.length > 0 && (
           <section className="section">
-            <h2 className="section-title">Recent</h2>
+            <div className="section-header">
+              <h2 className="section-title">Recent</h2>
+            </div>
             <div className="project-grid">
               {recentProjects.map((project) => (
                 <ProjectCard
@@ -2604,7 +2708,9 @@ function App() {
 
         {showFavorites && favoriteProjects.length > 0 && (
           <section className="section">
-            <h2 className="section-title">Favorites</h2>
+            <div className="section-header">
+              <h2 className="section-title">Favorites</h2>
+            </div>
             <div className="project-grid">
               {favoriteProjects.map((project) => (
                 <ProjectCard
