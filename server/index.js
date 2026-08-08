@@ -146,6 +146,10 @@ app.post('/api/open', async (req, res) => {
       return res.status(400).json({ error: 'Project path is required' });
     }
 
+    if (!(await fs.pathExists(projectPath))) {
+      return res.status(404).json({ error: 'Project path not found' });
+    }
+
     // 최근 목록 업데이트
     if (projectName) {
       let recentProjects = (await fs.readFile(recentFile, 'utf8'))

@@ -348,11 +348,18 @@ function App() {
           loadProjects()
         }, 1000)
           return
+      } else if (response.status === 404) {
+        addLog('error', `프로젝트 열기 실패 (경로 없음): ${project.name} (${project.path})`)
+        setMessage(`경로를 찾을 수 없습니다.\n경로: ${project.path}`)
+        return
       } else {
-          throw new Error('API 응답 오류')
-        }
+        const data = await response.json().catch(() => ({}))
+        addLog('error', `프로젝트 열기 실패: ${project.name} - ${data.error || '알 수 없는 오류'}`)
+        setMessage(`프로젝트 열기 실패: ${data.error || '알 수 없는 오류'}`)
+        return
+      }
       } catch (apiError) {
-        // API 호출 실패 시 (백엔드 서버가 실행되지 않은 경우)
+        // fetch 자체가 실패한 경우 = 서버 미실행
         console.warn('백엔드 서버에 연결할 수 없습니다. 경로를 클립보드에 복사합니다.', apiError)
         addLog('error', `프로젝트 열기 실패 (서버 미실행): ${project.name} (${project.path})`)
         // 경로를 클립보드에 복사
