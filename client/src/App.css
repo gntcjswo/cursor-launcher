@@ -1163,16 +1163,6 @@ linear infinite;
   color: #155724;
 }
 
-.json-copy-btn {
-  color: #20c997;
-  border-color: #20c997;
-}
-
-.json-copy-btn:hover {
-  background: #d3f9ee;
-  border-color: #0ca678;
-  color: #0ca678;
-}
 
 .password-btn {
   color: #6f42c1;

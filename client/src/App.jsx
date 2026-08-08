@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { FaStar, FaRegStar, FaPlus, FaTimes, FaEdit, FaTrash, FaFolder, FaSignInAlt, FaSignOutAlt, FaUserShield, FaCheck, FaChevronDown, FaArrowsAlt, FaGripVertical, FaCopy, FaStickyNote, FaFolderOpen, FaFileCode, FaCog, FaHistory, FaEye, FaEyeSlash, FaKey, FaClipboard } from 'react-icons/fa'
+import { FaStar, FaRegStar, FaPlus, FaTimes, FaEdit, FaTrash, FaFolder, FaSignInAlt, FaSignOutAlt, FaUserShield, FaCheck, FaChevronDown, FaArrowsAlt, FaGripVertical, FaCopy, FaStickyNote, FaFolderOpen, FaFileCode, FaCog, FaHistory, FaEye, FaEyeSlash, FaKey } from 'react-icons/fa'
 import { signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth'
 import { auth, googleProvider } from './firebase'
 import {
@@ -1402,17 +1402,6 @@ function App() {
     }
   }
 
-  const handleCopyJsonPath = async (project) => {
-    if (!project.jsonPath) return
-    const fullPath = `${project.path}/${project.jsonPath.replace(/^[/\\]/, '')}`
-    try {
-      await navigator.clipboard.writeText(fullPath)
-      setMessage(`${project.jsonPath} 경로가 클립보드에 복사되었습니다.`)
-      setTimeout(() => setMessage(''), 2000)
-    } catch {
-      setMessage('클립보드 복사에 실패했습니다.')
-    }
-  }
 
   const handleCategorySettings = (categoryName) => {
     setSelectedCategoryForSettings(categoryName)
@@ -2807,7 +2796,6 @@ function App() {
                   onOpenFolder={handleOpenFolder}
                   onOpenJsonFile={handleOpenJsonFile}
                   onCopyPassword={handleCopyPassword}
-                  onCopyJsonPath={handleCopyJsonPath}
                   isRecent={true}
                   isAllowed={isAllowed}
                 />
@@ -2835,7 +2823,6 @@ function App() {
                   onOpenFolder={handleOpenFolder}
                   onOpenJsonFile={handleOpenJsonFile}
                   onCopyPassword={handleCopyPassword}
-                  onCopyJsonPath={handleCopyJsonPath}
                   isAllowed={isAllowed}
                 />
               ))}
@@ -2906,7 +2893,6 @@ function App() {
                   onOpenFolder={handleOpenFolder}
                   onOpenJsonFile={handleOpenJsonFile}
                   onCopyPassword={handleCopyPassword}
-                  onCopyJsonPath={handleCopyJsonPath}
                   isAllowed={isAllowed}
                   sortMode={sortMode}
                   isDragged={draggedProjectId === project.id}
@@ -2942,7 +2928,6 @@ function ProjectCard({
   onOpenFolder,
   onOpenJsonFile,
   onCopyPassword,
-  onCopyJsonPath,
   isRecent, 
   isAllowed, 
   categories,
@@ -3117,28 +3102,16 @@ function ProjectCard({
                   ? categoryData.settings.useSftpPlugin || false
                   : false
                 return useSftpPlugin && (
-                  <>
-                    <button
-                      className="action-btn json-btn"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        onOpenJsonFile?.(project)
-                      }}
-                      title={`${project.jsonPath} 파일 열기`}
-                    >
-                      <FaFileCode />
-                    </button>
-                    <button
-                      className="action-btn json-copy-btn"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        onCopyJsonPath?.(project)
-                      }}
-                      title={`${project.jsonPath} 경로 복사`}
-                    >
-                      <FaClipboard />
-                    </button>
-                  </>
+                  <button
+                    className="action-btn json-btn"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onOpenJsonFile?.(project)
+                    }}
+                    title={`${project.jsonPath} 파일 열기`}
+                  >
+                    <FaFileCode />
+                  </button>
                 )
               })()}
             </div>
